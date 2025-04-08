@@ -19,7 +19,7 @@ if (!$restaurant) {
 }
 
 // 檢查用戶是否有權限刪除此餐廳
-if (!canManageRestaurant($id, $_SESSION['user_id'])) {
+if (!isset($restaurant['created_by']) || $restaurant['created_by'] != $_SESSION['user_id']) {
     setFlashMessage('您沒有權限刪除此餐廳', 'danger');
     redirect('restaurants');
 }

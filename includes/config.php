@@ -96,6 +96,27 @@ $routes = [
         'file' => 'join_event.php',
         'auth' => false,
         'title' => '加入活動'
+    ],
+    
+    // 資料庫更新路由
+    'update_restaurant_table' => [
+        'file' => 'update_restaurant_table.php',
+        'auth' => true,
+        'title' => '更新餐廳資料表'
+    ],
+    
+    // 餐廳更新坐標
+    'update_restaurant_coordinates' => [
+        'file' => 'update_restaurant_coordinates.php',
+        'auth' => true,
+        'title' => '更新餐廳座標'
+    ],
+    
+    // 使用者相關頁面
+    'user_profile' => [
+        'file' => 'user_profile.php',
+        'auth' => true,
+        'title' => '個人資料設定'
     ]
 ];
 

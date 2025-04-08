@@ -1,11 +1,19 @@
 <?php
 // 路由和URL相關功能
 
-// 增加調試功能
-function debug($data) {
-    echo '<pre>';
+/**
+ * 輔助調試函數 - 格式化輸出變數
+ * @param mixed $data 要輸出的數據
+ * @param bool $exit 是否在輸出後結束腳本執行
+ */
+function debug($data, $exit = false) {
+    echo '<pre style="background-color: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; border: 1px solid #ddd; color: #333; font-family: monospace; overflow: auto;">';
     print_r($data);
     echo '</pre>';
+    
+    if ($exit) {
+        exit;
+    }
 }
 
 // 動態偵測基礎URL路徑
@@ -119,9 +127,9 @@ function getCurrentRoute() {
  * @return string 格式化的URL
  */
 function url($route, $params = []) {
-    // 修正：確保使用正確的BASE_URL常數
+    // 確保使用正確的BASE_URL常數
     if (!defined('BASE_URL')) {
-        define('BASE_URL', '/'+"numnumhub"+'/');
+        define('BASE_URL', '/numnumhub/');
     }
     
     // 基礎URL

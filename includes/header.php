@@ -3,6 +3,13 @@
 if (!isset($pageTitle)) {
     $pageTitle = SITE_NAME;
 }
+
+// 如果用戶已登入，獲取他們的標籤
+$userTags = [];
+if (isLoggedIn() && file_exists(__DIR__ . '/../tags/functions.php')) {
+    require_once __DIR__ . '/../tags/functions.php';
+    $userTags = getUserTags($_SESSION['user_id']);
+}
 ?>
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -22,6 +29,26 @@ if (!isset($pageTitle)) {
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <?php if (!empty($userTags)): ?>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="tagsDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="fas fa-tags"></i> 我的標籤
+                            </a>
+                            <div class="dropdown-menu" aria-labelledby="tagsDropdown">
+                                <?php foreach($userTags as $tag): ?>
+                                <a class="dropdown-item" href="<?php echo url('restaurants', ['tag' => $tag['id']]); ?>">
+                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                </a>
+                                <?php endforeach; ?>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="<?php echo url('user_profile'); ?>#preferences">
+                                    <i class="fas fa-cog"></i> 管理標籤
+                                </a>
+                            </div>
+                        </li>
+                    <?php endif; ?>
+                </ul>
                 <ul class="navbar-nav ml-auto">
                     <?php if (isLoggedIn()): ?>
                         <li class="nav-item">
@@ -33,8 +60,19 @@ if (!isset($pageTitle)) {
                         <li class="nav-item">
                             <a class="nav-link" href="<?php echo url('events'); ?>">活動管理</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?php echo url('logout'); ?>">登出 (<?php echo htmlspecialchars($_SESSION['user_name']); ?>)</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <?php echo htmlspecialchars($_SESSION['user_name']); ?>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-right" aria-labelledby="profileDropdown">
+                                <a class="dropdown-item" href="<?php echo url('user_profile'); ?>">
+                                    <i class="fas fa-user"></i> 個人資料
+                                </a>
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="<?php echo url('logout'); ?>">
+                                    <i class="fas fa-sign-out-alt"></i> 登出
+                                </a>
+                            </div>
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
