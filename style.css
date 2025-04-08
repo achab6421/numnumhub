@@ -1,0 +1,38 @@
+body {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+footer {
+    margin-top: auto;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    font-weight: 500;
+}
+
+.jumbotron {
+    background-color: #e9ecef;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: 0.3rem;
+}
+
+.badge {
+    font-size: 85%;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+.btn-block {
+    padding: 0.75rem 0;
+}

@@ -1,0 +1,19 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # 將基礎路徑設定為根目錄，不再使用/numnumhub/
+    RewriteBase /numnumhub/
+    
+    # 如果請求的是實際存在的檔案或目錄，直接訪問
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # 所有非實際檔案的請求都導向index.php (前端控制器)
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# 設置默認索引文件
+DirectoryIndex index.php
+
+# 設置默認字符集
+AddDefaultCharset UTF-8
