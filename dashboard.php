@@ -1,6 +1,11 @@
 <?php
-require_once __DIR__ . '/auth/functions.php';
-requireLogin(); // 確保用戶已登入
+// 使用正確的初始化文件
+require_once 'includes/init.php';
+
+// 確保用戶已登入
+if (!isLoggedIn()) {
+    redirect('login');
+}
 
 // 獲取使用者創建的餐廳數量
 $restaurantQuery = "SELECT COUNT(*) AS restaurant_count FROM restaurants WHERE created_by = ?";
@@ -30,7 +35,7 @@ $recentEventsStmt->bind_param("i", $_SESSION['user_id']);
 $recentEventsStmt->execute();
 $recentEvents = $recentEventsStmt->get_result();
 
-include 'header.php';
+include 'includes/header.php';
 ?>
 
 <div class="jumbotron">
@@ -57,8 +62,9 @@ include 'header.php';
                 </div>
             </div>
             <div class="card-footer">
-                <a href="restaurants.php" class="btn btn-primary btn-sm">管理餐廳</a>
-                <a href="events.php" class="btn btn-success btn-sm">管理活動</a>
+                <!-- 修正餐廳管理連結 -->
+                <a href="<?php echo url('restaurants'); ?>" class="btn btn-primary btn-sm">管理餐廳</a>
+                <a href="<?php echo url('events'); ?>" class="btn btn-success btn-sm">管理活動</a>
             </div>
         </div>
     </div>
@@ -94,7 +100,7 @@ include 'header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="event_detail.php?id=<?php echo $event['id']; ?>" class="btn btn-sm btn-info">查看</a>
+                                        <a href="<?php echo url('event', ['id' => $event['id']]); ?>" class="btn btn-sm btn-info">查看</a>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -105,7 +111,8 @@ include 'header.php';
                 <?php endif; ?>
             </div>
             <div class="card-footer">
-                <a href="create_event.php" class="btn btn-success">建立新活動</a>
+                <!-- 修正建立活動連結 -->
+                <a href="<?php echo url('create-event'); ?>" class="btn btn-success">建立新活動</a>
             </div>
         </div>
     </div>
@@ -120,18 +127,21 @@ include 'header.php';
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <a href="create_restaurant.php" class="btn btn-outline-primary btn-lg btn-block">
-                            <i class="fa fa-plus-circle"></i> 新增餐廳
+                        <!-- 修正新增餐廳連結 -->
+                        <a href="<?php echo url('create-restaurant'); ?>" class="btn btn-outline-primary btn-lg btn-block">
+                            <i class="fas fa-plus-circle"></i> 新增餐廳
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="create_event.php" class="btn btn-outline-success btn-lg btn-block">
-                            <i class="fa fa-calendar-plus"></i> 建立活動
+                        <!-- 修正建立活動連結 -->
+                        <a href="<?php echo url('create-event'); ?>" class="btn btn-outline-success btn-lg btn-block">
+                            <i class="fas fa-calendar-plus"></i> 建立活動
                         </a>
                     </div>
                     <div class="col-md-4 mb-3">
-                        <a href="join_event.php" class="btn btn-outline-info btn-lg btn-block">
-                            <i class="fa fa-sign-in-alt"></i> 加入活動
+                        <!-- 修正加入活動連結 -->
+                        <a href="<?php echo url('join'); ?>" class="btn btn-outline-info btn-lg btn-block">
+                            <i class="fas fa-sign-in-alt"></i> 加入活動
                         </a>
                     </div>
                 </div>
@@ -140,4 +150,4 @@ include 'header.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

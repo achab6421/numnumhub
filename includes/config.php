@@ -46,25 +46,31 @@ $routes = [
         'auth' => true,
         'title' => '會員主頁'
     ],
+    // 餐廳管理 - 更新路徑指向新資料夾
     'restaurants' => [
-        'file' => 'restaurants.php',
+        'file' => 'restaurants/index.php',
         'auth' => true,
         'title' => '餐廳管理'
     ],
     'restaurant' => [
-        'file' => 'restaurant_detail.php',
+        'file' => 'restaurants/view.php',
         'auth' => true,
         'title' => '餐廳詳情'
     ],
     'create-restaurant' => [
-        'file' => 'create_restaurant.php',
+        'file' => 'restaurants/create.php',
         'auth' => true,
         'title' => '新增餐廳'
     ],
     'edit-restaurant' => [
-        'file' => 'edit_restaurant.php',
+        'file' => 'restaurants/edit.php',
         'auth' => true,
         'title' => '編輯餐廳'
+    ],
+    'delete-restaurant' => [
+        'file' => 'restaurants/delete.php',
+        'auth' => true,
+        'title' => '刪除餐廳'
     ],
     'events' => [
         'file' => 'events.php',

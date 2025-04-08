@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/auth/functions.php';
+require_once __DIR__ . '/includes/init.php';
 $isLoggedIn = isLoggedIn();
 ?>
 <!DOCTYPE html>
@@ -7,14 +7,15 @@ $isLoggedIn = isLoggedIn();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NumNumHub - 線上點餐系統</title>
+    <title><?php echo isset($pageTitle) ? $pageTitle . ' - ' : ''; ?><?php echo SITE_NAME; ?></title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <link rel="stylesheet" href="">
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/index.php">NumNumHub</a>
+            <a class="navbar-brand" href="<?php echo url('index'); ?>"><?php echo SITE_NAME; ?></a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -22,23 +23,23 @@ $isLoggedIn = isLoggedIn();
                 <ul class="navbar-nav ml-auto">
                     <?php if ($isLoggedIn): ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="/dashboard.php">我的主頁</a>
+                            <a class="nav-link" href="<?php echo url('dashboard'); ?>">我的主頁</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/restaurants.php">餐廳管理</a>
+                            <a class="nav-link" href="<?php echo url('restaurants'); ?>">餐廳管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/events.php">活動管理</a>
+                            <a class="nav-link" href="<?php echo url('events'); ?>">活動管理</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/auth/logout.php">登出</a>
+                            <a class="nav-link" href="<?php echo url('logout'); ?>">登出</a>
                         </li>
                     <?php else: ?>
                         <li class="nav-item">
-                            <a class="nav-link" href="/auth/login.php">登入</a>
+                            <a class="nav-link" href="<?php echo url('login'); ?>">登入</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/auth/register.php">註冊</a>
+                            <a class="nav-link" href="<?php echo url('register'); ?>">註冊</a>
                         </li>
                     <?php endif; ?>
                 </ul>
@@ -46,3 +47,16 @@ $isLoggedIn = isLoggedIn();
         </div>
     </nav>
     <div class="container mt-4">
+        <?php if (isset($_SESSION['flash_message'])): ?>
+            <div class="alert alert-<?php echo $_SESSION['flash_type']; ?> alert-dismissible fade show">
+                <?php echo $_SESSION['flash_message']; ?>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <?php 
+            // 顯示後清除閃存訊息
+            unset($_SESSION['flash_message']);
+            unset($_SESSION['flash_type']);
+            ?>
+        <?php endif; ?>
