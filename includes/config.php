@@ -1,14 +1,14 @@
 <?php
 // 資料庫連接設定
-define('DB_SERVER', 'localhost');
-define('DB_USERNAME', 'root');
-define('DB_PASSWORD', '');
-define('DB_NAME', 'numnumhub');
+if (!defined('DB_SERVER')) define('DB_SERVER', 'localhost');
+if (!defined('DB_USERNAME')) define('DB_USERNAME', 'root');
+if (!defined('DB_PASSWORD')) define('DB_PASSWORD', '');
+if (!defined('DB_NAME')) define('DB_NAME', 'numnumhub');
 // 正式環境
-// define('DB_SERVER', 'sql101.infinityfree.com');
-// define('DB_USERNAME', 'if0_37303437');
-// define('DB_PASSWORD', 'GGEJlUj4V0D');
-// define('DB_NAME', 'if0_37303437_numnumhub');
+// if (!defined('DB_SERVER')) define('DB_SERVER', 'sql101.infinityfree.com');
+// if (!defined('DB_USERNAME'))  define('DB_USERNAME', 'if0_37303437');
+// if (!defined('DB_PASSWORD'))  define('DB_PASSWORD', 'GGEJlUj4V0D');
+// if (!defined('DB_NAME')) define('DB_NAME', 'if0_37303437_numnumhub');
 // 網站基本設定
 $url_name = "numnumhub";
 // 修正：確保BASE_URL包含前後斜線，這對於乾淨URL至關重要
@@ -30,7 +30,7 @@ $routes = [
         'title' => '會員登入'
     ],
     'register' => [
-        'file' => 'register.php', 
+        'file' => 'auth/register.php', 
         'auth' => false,
         'title' => '會員註冊'
     ],
