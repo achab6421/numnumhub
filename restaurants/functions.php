@@ -89,6 +89,7 @@ function createRestaurant($data) {
         // 表中有經緯度欄位，使用更新後的SQL語句
         $sql = "INSERT INTO restaurants (name, address, phone, link, note, latitude, longitude, created_by) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("sssssddi", 
             $data['name'], 
@@ -305,7 +306,7 @@ function canManageRestaurant($restaurant_id, $user_id) {
 }
 
 /**
- * 設置提示訊息（通常用於重導後顯示）
+ * 設置提示訊息（通常用於重導後顯示） 
  * @param string $message 訊息內容
  * @param string $type 訊息類型 (success, danger, warning, info)
  */
@@ -315,45 +316,99 @@ function setFlashMessage($message, $type = 'success') {
 }
 
 /**
- * 獲取所有餐廳的標籤關係
- * @param array $restaurant_ids 餐廳ID陣列，如果為空則獲取所有關聯
- * @return array 餐廳標籤關聯資料，以餐廳ID為鍵
+ * 為餐廳獲取標籤選項，現在只返回當前使用者的標籤
+ * @param int $userId 使用者ID
+ * @return array 標籤列表
  */
-function getAllRestaurantTags($restaurant_ids = []) {
+function getTagOptions($userId) {
+    // 直接使用 getTags 函數獲取使用者的標籤
+    return getTags($userId);
+}
+
+/**
+ * 更新餐廳的標籤關聯
+ * @param int $restaurantId 餐廳ID
+ * @param array $tagIds 標籤ID數組
+ * @return array 操作結果
+ */
+function updateRestaurantTags($restaurantId, $tagIds = []) {
     global $conn;
     
-    // 準備SQL查詢
-    $sql = "SELECT rt.restaurant_id, t.id as tag_id, t.name as tag_name 
-            FROM restaurant_tags rt 
-            JOIN tags t ON rt.tag_id = t.id";
+    // 啟用交易處理
+    $conn->begin_transaction();
     
-    // 如果指定了餐廳ID，則只獲取這些餐廳的標籤
-    if (!empty($restaurant_ids)) {
-        $ids = implode(',', array_map('intval', $restaurant_ids));
-        $sql .= " WHERE rt.restaurant_id IN ($ids)";
-    }
-    
-    $result = $conn->query($sql);
-    
-    // 將結果整理為以餐廳ID為鍵的陣列
-    $restaurantTags = [];
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $restaurant_id = $row['restaurant_id'];
-            
-            // 初始化該餐廳的標籤陣列（如果還不存在）
-            if (!isset($restaurantTags[$restaurant_id])) {
-                $restaurantTags[$restaurant_id] = [];
-            }
-            
-            // 添加標籤信息到對應餐廳的陣列中
-            $restaurantTags[$restaurant_id][] = [
-                'id' => $row['tag_id'],
-                'name' => $row['tag_name']
+    try {
+        // 刪除該餐廳的所有現有標籤關聯
+        $deleteSql = "DELETE FROM restaurant_tags WHERE restaurant_id = ?";
+        $deleteStmt = $conn->prepare($deleteSql);
+        $deleteStmt->bind_param("i", $restaurantId);
+        
+        if (!$deleteStmt->execute()) {
+            $conn->rollback();
+            return [
+                "success" => false, 
+                "message" => "移除舊標籤關聯失敗: " . $deleteStmt->error
             ];
         }
+        
+        // 如果沒有新標籤，直接返回成功
+        if (empty($tagIds)) {
+            $conn->commit();
+            return ["success" => true, "message" => "餐廳標籤已更新"];
+        }
+        
+        // 準備批次插入的語句
+        $insertSql = "INSERT INTO restaurant_tags (restaurant_id, tag_id) VALUES (?, ?)";
+        $insertStmt = $conn->prepare($insertSql);
+        $insertStmt->bind_param("ii", $restaurantId, $tagId);
+        
+        // 為每個標籤創建關聯
+        $insertCount = 0;
+        foreach ($tagIds as $tagId) {
+            if (empty($tagId)) continue;
+            
+            $tagId = (int)$tagId;
+            if ($insertStmt->execute()) {
+                $insertCount++;
+            }
+        }
+        
+        // 提交交易
+        $conn->commit();
+        return [
+            "success" => true, 
+            "message" => "已更新 {$insertCount} 個標籤關聯", 
+            "count" => $insertCount
+        ];
+    } catch (Exception $e) {
+        $conn->rollback();
+        return ["success" => false, "message" => "標籤更新失敗: " . $e->getMessage()];
+    }
+}
+
+/**
+ * 獲取指定餐廳的所有標籤
+ * @param int $restaurantId 餐廳ID
+ * @return array 餐廳標籤數組
+ */
+function getRestaurantTags($restaurantId) {
+    global $conn;
+    
+    $sql = "SELECT t.* 
+            FROM tags t 
+            INNER JOIN restaurant_tags rt ON t.id = rt.tag_id 
+            WHERE rt.restaurant_id = ?";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $restaurantId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $tags = [];
+    while ($row = $result->fetch_assoc()) {
+        $tags[] = $row;
     }
     
-    return $restaurantTags;
+    return $tags;
 }
 ?>

@@ -18,9 +18,15 @@ if ($result->num_rows === 0) {
     setFlashMessage('餐廳資料表需要更新，請點擊<a href="' . url('update_restaurant_table') . '">這裡</a>進行更新', 'warning');
 }
 
-// 獲取所有標籤以用於篩選
-$allTags = getAllTags();
-$filterTag = isset($_GET['tag']) ? (int)$_GET['tag'] : 0;
+// 獲取當前使用者ID
+$userId = $_SESSION['user_id'];
+
+// 修改：只獲取當前使用者的標籤，而不是所有標籤
+// 原程式碼: $allTags = getAllTags();
+$allTags = getTags($userId);
+
+// 修改為接收多個標籤ID
+$filterTags = isset($_GET['tags']) && is_array($_GET['tags']) ? array_map('intval', $_GET['tags']) : [];
 
 // 獲取當前用戶的所有餐廳
 try {
@@ -45,17 +51,17 @@ try {
             ? $allRestaurantTags[$restaurant['id']] 
             : [];
         
-        // 如果有標籤篩選，檢查餐廳是否有指定標籤
-        if ($filterTag > 0) {
-            $hasTag = false;
+        // 修改篩選邏輯以支援多標籤
+        if (!empty($filterTags)) {
+            $hasAnyTag = false;
             foreach ($restaurant['tags'] as $tag) {
-                if ($tag['id'] == $filterTag) {
-                    $hasTag = true;
+                if (in_array($tag['id'], $filterTags)) {
+                    $hasAnyTag = true;
                     break;
                 }
             }
-            // 只添加包含指定標籤的餐廳
-            if ($hasTag) {
+            // 只添加包含任一指定標籤的餐廳
+            if ($hasAnyTag) {
                 $restaurantsWithTags[] = $restaurant;
             }
         } else {
@@ -81,26 +87,41 @@ include_once __DIR__ . '/../includes/header.php';
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1 class="h2">餐廳管理</h1>
-    <a href="<?php echo url('create-restaurant'); ?>" class="btn btn-primary">
-        <i class="fas fa-plus"></i> 新增餐廳
-    </a>
+    <div>
+        <button id="randomRestaurantBtn" class="btn btn-success mr-2">
+            <i class="fas fa-random"></i> 隨機推薦
+        </button>
+        <a href="<?php echo url('create-restaurant'); ?>" class="btn btn-primary">
+            <i class="fas fa-plus"></i> 新增餐廳
+        </a>
+    </div>
 </div>
 
-<!-- 標籤篩選 -->
+<!-- 標籤篩選 - 改為複選框形式 -->
 <?php if (!empty($allTags)): ?>
 <div class="card mb-4">
     <div class="card-body">
         <h5 class="mb-3">依標籤篩選</h5>
-        <div class="d-flex flex-wrap">
-            <a href="<?php echo url('restaurants'); ?>" class="btn <?php echo $filterTag === 0 ? 'btn-primary' : 'btn-outline-primary'; ?> mr-2 mb-2">
-                全部
-            </a>
-            <?php foreach($allTags as $tag): ?>
-            <a href="<?php echo url('restaurants', ['tag' => $tag['id']]); ?>" class="btn <?php echo $filterTag === $tag['id'] ? 'btn-primary' : 'btn-outline-primary'; ?> mr-2 mb-2">
-                <?php echo htmlspecialchars($tag['name']); ?>
-            </a>
-            <?php endforeach; ?>
-        </div>
+        <form id="tagFilterForm" method="get" action="<?php echo url('restaurants'); ?>">
+            <div class="d-flex flex-wrap align-items-center mb-3">
+                <?php foreach($allTags as $tag): ?>
+                <div class="custom-control custom-checkbox mr-4 mb-2">
+                    <input type="checkbox" class="custom-control-input tag-filter-checkbox" 
+                           id="tag_<?php echo $tag['id']; ?>" 
+                           name="tags[]" 
+                           value="<?php echo $tag['id']; ?>"
+                           <?php echo in_array($tag['id'], $filterTags) ? 'checked' : ''; ?>>
+                    <label class="custom-control-label" for="tag_<?php echo $tag['id']; ?>">
+                        <?php echo htmlspecialchars($tag['name']); ?>
+                    </label>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <div class="btn-group">
+                <button type="submit" class="btn btn-primary">套用篩選</button>
+                <a href="<?php echo url('restaurants'); ?>" class="btn btn-outline-secondary">清除篩選</a>
+            </div>
+        </form>
     </div>
 </div>
 <?php endif; ?>
@@ -185,8 +206,8 @@ include_once __DIR__ . '/../includes/header.php';
     </div>
 <?php else: ?>
     <div class="alert alert-info">
-        <?php if ($filterTag > 0): ?>
-            <i class="fas fa-info-circle"></i> 沒有找到符合此標籤的餐廳。
+        <?php if (!empty($filterTags)): ?>
+            <i class="fas fa-info-circle"></i> 沒有找到符合這些標籤的餐廳。
         <?php else: ?>
             <i class="fas fa-info-circle"></i> 您尚未新增任何餐廳，點擊上方「新增餐廳」按鈕開始建立。
         <?php endif; ?>
@@ -225,6 +246,66 @@ document.addEventListener('DOMContentLoaded', function() {
             viewRestaurantSwal(restaurantId, restaurantName);
         });
     });
+    
+    // 隨機推薦餐廳功能
+    const randomRestaurantBtn = document.getElementById('randomRestaurantBtn');
+    if (randomRestaurantBtn) {
+        randomRestaurantBtn.addEventListener('click', function() {
+            // 獲取當前頁面上顯示的所有餐廳行
+            const restaurantRows = document.querySelectorAll('table tbody tr');
+            
+            // 檢查是否有餐廳可供選擇
+            if (restaurantRows.length === 0) {
+                Swal.fire({
+                    title: '無法推薦',
+                    text: '目前沒有符合條件的餐廳',
+                    icon: 'info'
+                });
+                return;
+            }
+            
+            // 隨機選擇一個餐廳
+            const randomIndex = Math.floor(Math.random() * restaurantRows.length);
+            const selectedRow = restaurantRows[randomIndex];
+            
+            // 獲取該餐廳的信息
+            const restaurantName = selectedRow.cells[0].textContent.trim();
+            const restaurantAddress = selectedRow.cells[1].textContent.trim();
+            const restaurantPhone = selectedRow.cells[2].textContent.trim();
+            
+            // 獲取餐廳ID (從操作按鈕中讀取)
+            const viewBtn = selectedRow.querySelector('.view-restaurant-btn');
+            const restaurantId = viewBtn ? viewBtn.getAttribute('data-id') : null;
+            
+            // 使用SweetAlert2顯示隨機選擇的餐廳
+            Swal.fire({
+                title: '今天推薦您去：',
+                html: `
+                    <div class="text-center mb-4">
+                        <h3 class="text-success">${restaurantName}</h3>
+                        <p><strong>地址：</strong>${restaurantAddress || '無資料'}</p>
+                        <p><strong>電話：</strong>${restaurantPhone || '無資料'}</p>
+                    </div>
+                `,
+                icon: 'success',
+                showCancelButton: true,
+                confirmButtonText: '查看詳情',
+                cancelButtonText: '重新隨機',
+                showDenyButton: true,
+                denyButtonText: '關閉',
+                focusConfirm: false
+            }).then((result) => {
+                if (result.isConfirmed && restaurantId) {
+                    // 如果用戶選擇"查看詳情"，顯示餐廳詳細信息
+                    viewRestaurantSwal(restaurantId, restaurantName);
+                } else if (result.isDismissed) {
+                    // 如果用戶選擇"重新隨機"，再次執行隨機選擇
+                    randomRestaurantBtn.click();
+                }
+                // 如果用戶選擇"關閉"，什麼都不做，對話框會自動關閉
+            });
+        });
+    }
     
     // 使用 SweetAlert 編輯餐廳
     function editRestaurant(restaurantId, restaurantName) {

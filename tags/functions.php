@@ -4,347 +4,301 @@
  */
 
 /**
- * 獲取所有標籤
- * @return array 標籤數據數組
+ * 獲取使用者的標籤
+ * @param int $userId 使用者ID
+ * @return array 標籤列表
+ */
+function getTags($userId) {
+    global $conn;
+    
+    // 修正：使用JOIN查詢user_tags表獲取使用者的標籤
+    $sql = "SELECT t.* FROM tags t 
+            INNER JOIN user_tags ut ON t.id = ut.tag_id 
+            WHERE ut.user_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $userId);
+    
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $tags = [];
+    
+    while ($row = $result->fetch_assoc()) {
+        $tags[] = $row;
+    }
+    
+    return $tags;
+}
+
+/**
+ * 獲取所有標籤，可用於選擇
+ * @return array 所有標籤列表
  */
 function getAllTags() {
     global $conn;
     
-    $sql = "SELECT * FROM tags ORDER BY name";
+    $sql = "SELECT * FROM tags";
     $result = $conn->query($sql);
-    
     $tags = [];
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $tags[] = $row;
-        }
+    
+    while ($row = $result->fetch_assoc()) {
+        $tags[] = $row;
     }
     
     return $tags;
 }
 
 /**
- * 獲取指定ID的標籤
- * @param int $id 標籤ID
- * @return array|null 標籤數據或null
+ * 獲取餐廳的標籤
+ * @param array $restaurantIds 餐廳ID數組
+ * @return array 餐廳標籤關聯數組
  */
-function getTag($id) {
-    global $conn;
-    
-    $sql = "SELECT * FROM tags WHERE id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        return null;
-    }
-    
-    return $result->fetch_assoc();
-}
-
-/**
- * 根據名稱獲取標籤，如果不存在則創建
- * @param string $name 標籤名稱
- * @return array 標籤數據
- */
-function getOrCreateTag($name) {
-    $tag = getTagByName($name);
-    
-    if (!$tag) {
-        $result = createTag($name);
-        if ($result['success']) {
-            $tag = getTag($result['id']);
+if (!function_exists('getAllRestaurantTags')) {
+    function getAllRestaurantTags($restaurantIds) {
+        global $conn;
+        
+        if (empty($restaurantIds)) {
+            return [];
         }
+        
+        // 將ID數組轉換為逗號分隔的字符串
+        $idList = implode(',', array_map('intval', $restaurantIds));
+        
+        $sql = "SELECT rt.restaurant_id, t.* 
+                FROM restaurant_tags rt 
+                INNER JOIN tags t ON rt.tag_id = t.id 
+                WHERE rt.restaurant_id IN ($idList)";
+        
+        $result = $conn->query($sql);
+        $restaurantTags = [];
+        
+        while ($row = $result->fetch_assoc()) {
+            $restaurantId = $row['restaurant_id'];
+            unset($row['restaurant_id']);
+            
+            if (!isset($restaurantTags[$restaurantId])) {
+                $restaurantTags[$restaurantId] = [];
+            }
+            
+            $restaurantTags[$restaurantId][] = $row;
+        }
+        
+        return $restaurantTags;
     }
-    
-    return $tag;
-}
-
-/**
- * 根據名稱獲取標籤
- * @param string $name 標籤名稱
- * @return array|null 標籤數據或null
- */
-function getTagByName($name) {
-    global $conn;
-    
-    $sql = "SELECT * FROM tags WHERE name = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $name);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows === 0) {
-        return null;
-    }
-    
-    return $result->fetch_assoc();
 }
 
 /**
  * 創建新標籤
+ * 這個函數會先檢查標籤是否存在，如果不存在則創建
+ * 然後會在user_tags表中創建關聯
+ * 
  * @param string $name 標籤名稱
+ * @param int $userId 使用者ID
  * @return array 操作結果
  */
-function createTag($name) {
+function createTag($name, $userId) {
     global $conn;
     
-    // 檢查標籤名稱是否為空
-    if (empty($name)) {
-        return [
-            'success' => false, 
-            'message' => '標籤名稱不能為空'
-        ];
-    }
-    
-    // 檢查標籤是否已存在
-    $existingTag = getTagByName($name);
-    if ($existingTag) {
-        return [
-            'success' => true,
-            'message' => '標籤已存在',
-            'id' => $existingTag['id']
-        ];
-    }
-    
-    // 創建新標籤
-    $sql = "INSERT INTO tags (name) VALUES (?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $name);
-    
-    if ($stmt->execute()) {
-        return [
-            'success' => true,
-            'message' => '標籤建立成功',
-            'id' => $conn->insert_id
-        ];
-    } else {
-        return [
-            'success' => false,
-            'message' => '標籤建立失敗: ' . $stmt->error
-        ];
-    }
-}
-
-/**
- * 獲取餐廳的所有標籤
- * @param int $restaurantId 餐廳ID
- * @return array 標籤數據數組
- */
-function getRestaurantTags($restaurantId) {
-    global $conn;
-    
-    $sql = "SELECT t.* FROM tags t
-            JOIN restaurant_tags rt ON t.id = rt.tag_id
-            WHERE rt.restaurant_id = ?
-            ORDER BY t.name";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $restaurantId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $tags = [];
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $tags[] = $row;
-        }
-    }
-    
-    return $tags;
-}
-
-/**
- * 為餐廳添加標籤
- * @param int $restaurantId 餐廳ID
- * @param int $tagId 標籤ID
- * @return bool 操作是否成功
- */
-function addTagToRestaurant($restaurantId, $tagId) {
-    global $conn;
-    
-    // 檢查關聯是否已存在
-    $checkSql = "SELECT id FROM restaurant_tags WHERE restaurant_id = ? AND tag_id = ?";
-    $checkStmt = $conn->prepare($checkSql);
-    $checkStmt->bind_param("ii", $restaurantId, $tagId);
-    $checkStmt->execute();
-    $checkResult = $checkStmt->get_result();
-    
-    if ($checkResult->num_rows > 0) {
-        return true; // 關聯已存在，視為成功
-    }
-    
-    // 添加新的關聯
-    $sql = "INSERT INTO restaurant_tags (restaurant_id, tag_id) VALUES (?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $restaurantId, $tagId);
-    
-    return $stmt->execute();
-}
-
-/**
- * 從餐廳移除標籤
- * @param int $restaurantId 餐廳ID
- * @param int $tagId 標籤ID
- * @return bool 操作是否成功
- */
-function removeTagFromRestaurant($restaurantId, $tagId) {
-    global $conn;
-    
-    $sql = "DELETE FROM restaurant_tags WHERE restaurant_id = ? AND tag_id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $restaurantId, $tagId);
-    
-    return $stmt->execute();
-}
-
-/**
- * 更新餐廳的標籤
- * @param int $restaurantId 餐廳ID
- * @param array $tagIds 標籤ID數組
- * @return bool 操作是否成功
- */
-function updateRestaurantTags($restaurantId, $tagIds) {
-    global $conn;
-    
-    // 開始事務
+    // 啟用交易處理
     $conn->begin_transaction();
     
     try {
-        // 先刪除所有現有關聯
-        $deleteSql = "DELETE FROM restaurant_tags WHERE restaurant_id = ?";
-        $deleteStmt = $conn->prepare($deleteSql);
-        $deleteStmt->bind_param("i", $restaurantId);
-        $deleteStmt->execute();
+        // 檢查標籤是否已存在
+        $checkSql = "SELECT id FROM tags WHERE name = ?";
+        $checkStmt = $conn->prepare($checkSql);
+        $checkStmt->bind_param("s", $name);
+        $checkStmt->execute();
+        $result = $checkStmt->get_result();
         
-        // 添加新的關聯
-        if (!empty($tagIds)) {
-            foreach ($tagIds as $tagId) {
-                $insertSql = "INSERT INTO restaurant_tags (restaurant_id, tag_id) VALUES (?, ?)";
-                $insertStmt = $conn->prepare($insertSql);
-                $insertStmt->bind_param("ii", $restaurantId, $tagId);
-                $insertStmt->execute();
+        // 如果標籤已存在，獲取ID
+        if ($result->num_rows > 0) {
+            $tagId = $result->fetch_assoc()['id'];
+        } else {
+            // 標籤不存在，創建新標籤
+            $insertSql = "INSERT INTO tags (name) VALUES (?)";
+            $insertStmt = $conn->prepare($insertSql);
+            $insertStmt->bind_param("s", $name);
+            
+            if (!$insertStmt->execute()) {
+                throw new Exception("創建標籤失敗: " . $insertStmt->error);
+            }
+            
+            $tagId = $conn->insert_id;
+        }
+        
+        // 檢查user_tags關聯是否已存在
+        $checkRelationSql = "SELECT id FROM user_tags WHERE user_id = ? AND tag_id = ?";
+        $checkRelationStmt = $conn->prepare($checkRelationSql);
+        $checkRelationStmt->bind_param("ii", $userId, $tagId);
+        $checkRelationStmt->execute();
+        
+        // 如果關聯不存在，創建關聯
+        if ($checkRelationStmt->get_result()->num_rows === 0) {
+            $relationSql = "INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)";
+            $relationStmt = $conn->prepare($relationSql);
+            $relationStmt->bind_param("ii", $userId, $tagId);
+            
+            if (!$relationStmt->execute()) {
+                throw new Exception("建立使用者標籤關聯失敗: " . $relationStmt->error);
             }
         }
         
-        // 提交事務
         $conn->commit();
-        return true;
+        return ["success" => true, "message" => "標籤已成功創建", "id" => $tagId];
     } catch (Exception $e) {
-        // 回滾事務
         $conn->rollback();
-        return false;
+        return ["success" => false, "message" => $e->getMessage()];
     }
 }
 
 /**
- * 獲取使用者的所有標籤
- * @param int $userId 使用者ID
- * @return array 標籤數據數組
- */
-function getUserTags($userId) {
-    global $conn;
-    
-    $sql = "SELECT t.* FROM tags t
-            JOIN user_tags ut ON t.id = ut.tag_id
-            WHERE ut.user_id = ?
-            ORDER BY t.name";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $userId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $tags = [];
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $tags[] = $row;
-        }
-    }
-    
-    return $tags;
-}
-
-/**
- * 為使用者添加標籤
- * @param int $userId 使用者ID
+ * 更新標籤
+ * 注意：這只會更新標籤名稱，不修改使用者關聯
  * @param int $tagId 標籤ID
- * @return bool 操作是否成功
+ * @param string $name 新標籤名稱
+ * @param int $userId 使用者ID，用於確認權限
+ * @return array 操作結果
  */
-function addTagToUser($userId, $tagId) {
+function updateTag($tagId, $name, $userId) {
     global $conn;
     
-    // 檢查關聯是否已存在
+    // 檢查使用者是否擁有此標籤
     $checkSql = "SELECT id FROM user_tags WHERE user_id = ? AND tag_id = ?";
     $checkStmt = $conn->prepare($checkSql);
     $checkStmt->bind_param("ii", $userId, $tagId);
     $checkStmt->execute();
-    $checkResult = $checkStmt->get_result();
     
-    if ($checkResult->num_rows > 0) {
-        return true; // 關聯已存在，視為成功
+    if ($checkStmt->get_result()->num_rows === 0) {
+        return ["success" => false, "message" => "標籤不存在或您無權修改"];
     }
     
-    // 添加新的關聯
-    $sql = "INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $userId, $tagId);
+    // 檢查新標籤名稱是否已存在
+    $checkNameSql = "SELECT id FROM tags WHERE name = ? AND id != ?";
+    $checkNameStmt = $conn->prepare($checkNameSql);
+    $checkNameStmt->bind_param("si", $name, $tagId);
+    $checkNameStmt->execute();
     
-    return $stmt->execute();
+    if ($checkNameStmt->get_result()->num_rows > 0) {
+        return ["success" => false, "message" => "標籤名稱已存在"];
+    }
+    
+    // 更新標籤名稱
+    $sql = "UPDATE tags SET name = ? WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("si", $name, $tagId);
+    
+    if ($stmt->execute()) {
+        return ["success" => true, "message" => "標籤已成功更新"];
+    } else {
+        return ["success" => false, "message" => "標籤更新失敗: " . $stmt->error];
+    }
 }
 
 /**
- * 從使用者移除標籤
- * @param int $userId 使用者ID
+ * 刪除標籤關聯
+ * 僅從user_tags表中刪除關聯，不刪除標籤本身
+ * 
  * @param int $tagId 標籤ID
- * @return bool 操作是否成功
+ * @param int $userId 使用者ID
+ * @return array 操作結果
  */
-function removeTagFromUser($userId, $tagId) {
+function deleteTag($tagId, $userId) {
     global $conn;
     
-    $sql = "DELETE FROM user_tags WHERE user_id = ? AND tag_id = ?";
+    // 刪除標籤關聯而非標籤本身
+    $sql = "DELETE FROM user_tags WHERE tag_id = ? AND user_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $userId, $tagId);
+    $stmt->bind_param("ii", $tagId, $userId);
     
-    return $stmt->execute();
+    if ($stmt->execute()) {
+        return ["success" => true, "message" => "標籤已從您的列表中移除"];
+    } else {
+        return ["success" => false, "message" => "移除標籤失敗: " . $stmt->error];
+    }
 }
 
 /**
- * 更新使用者的標籤
+ * 獲取特定標籤詳情
+ * @param int $tagId 標籤ID
+ * @param int $userId 使用者ID
+ * @return array|null 標籤信息
+ */
+function getTag($tagId, $userId) {
+    global $conn;
+    
+    // 確保標籤存在且屬於該使用者
+    $sql = "SELECT t.* FROM tags t 
+            INNER JOIN user_tags ut ON t.id = ut.tag_id 
+            WHERE t.id = ? AND ut.user_id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $tagId, $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result->num_rows === 0) {
+        return null;
+    }
+    
+    return $result->fetch_assoc();
+}
+
+/**
+ * 更新使用者的標籤關聯
  * @param int $userId 使用者ID
  * @param array $tagIds 標籤ID數組
- * @return bool 操作是否成功
+ * @return array 操作結果
  */
-function updateUserTags($userId, $tagIds) {
+function updateUserTags($userId, $tagIds = []) {
     global $conn;
     
-    // 開始事務
+    // 啟用交易處理
     $conn->begin_transaction();
     
     try {
-        // 先刪除所有現有關聯
+        // 刪除該使用者的所有現有標籤關聯
         $deleteSql = "DELETE FROM user_tags WHERE user_id = ?";
         $deleteStmt = $conn->prepare($deleteSql);
         $deleteStmt->bind_param("i", $userId);
-        $deleteStmt->execute();
         
-        // 添加新的關聯
-        if (!empty($tagIds)) {
-            foreach ($tagIds as $tagId) {
-                $insertSql = "INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)";
-                $insertStmt = $conn->prepare($insertSql);
-                $insertStmt->bind_param("ii", $userId, $tagId);
-                $insertStmt->execute();
+        if (!$deleteStmt->execute()) {
+            $conn->rollback();
+            return [
+                "success" => false, 
+                "message" => "移除舊標籤關聯失敗: " . $deleteStmt->error
+            ];
+        }
+        
+        // 如果沒有新標籤，直接返回成功
+        if (empty($tagIds)) {
+            $conn->commit();
+            return ["success" => true, "message" => "標籤已更新"];
+        }
+        
+        // 準備批次插入的語句
+        $insertSql = "INSERT INTO user_tags (user_id, tag_id) VALUES (?, ?)";
+        $insertStmt = $conn->prepare($insertSql);
+        $insertStmt->bind_param("ii", $userId, $tagId);
+        
+        // 為每個標籤創建關聯
+        $insertCount = 0;
+        foreach ($tagIds as $tagId) {
+            if (empty($tagId)) continue;
+            
+            $tagId = (int)$tagId;
+            if ($insertStmt->execute()) {
+                $insertCount++;
             }
         }
         
-        // 提交事務
+        // 提交交易
         $conn->commit();
-        return true;
+        return [
+            "success" => true, 
+            "message" => "已更新 {$insertCount} 個標籤關聯", 
+            "count" => $insertCount
+        ];
     } catch (Exception $e) {
-        // 回滾事務
         $conn->rollback();
-        return false;
+        return ["success" => false, "message" => "標籤更新失敗: " . $e->getMessage()];
     }
 }
 ?>

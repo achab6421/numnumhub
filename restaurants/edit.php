@@ -26,8 +26,12 @@ if (!canManageRestaurant($id, $_SESSION['user_id'])) {
     redirect('restaurants');
 }
 
-// 獲取所有標籤用於選擇
-$allTags = getAllTags();
+// 獲取當前使用者ID
+$userId = $_SESSION['user_id'];
+
+// 修改為只獲取使用者自己的標籤
+// 原程式碼可能是: $tagOptions = getAllTags();
+$tagOptions = getTags($userId);
 
 // 獲取餐廳已有標籤
 $restaurantTags = getRestaurantTags($id);
@@ -166,9 +170,9 @@ include_once __DIR__ . '/../includes/header.php';
                         <label>標籤</label>
                         <div class="card">
                             <div class="card-body">
-                                <?php if (!empty($allTags)): ?>
+                                <?php if (!empty($tagOptions)): ?>
                                     <div class="mb-3">
-                                        <?php foreach($allTags as $tag): ?>
+                                        <?php foreach($tagOptions as $tag): ?>
                                         <div class="custom-control custom-checkbox custom-control-inline">
                                             <input type="checkbox" class="custom-control-input" id="tag_<?php echo $tag['id']; ?>" name="tags[]" value="<?php echo $tag['id']; ?>" <?php echo in_array($tag['id'], $restaurantTagIds) ? 'checked' : ''; ?>>
                                             <label class="custom-control-label" for="tag_<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['name']); ?></label>

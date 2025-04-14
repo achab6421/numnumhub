@@ -1,7 +1,8 @@
 <?php
 // 使用者個人資料頁面
 require_once 'includes/init.php';
-require_once 'tags/functions.php';
+// 在頂部引入標籤功能函數
+require_once __DIR__ . '/tags/functions.php';
 
 // 確保用戶已登入
 if (!isLoggedIn()) {
@@ -13,40 +14,45 @@ $userId = $_SESSION['user_id'];
 $userName = $_SESSION['user_name'];
 $userEmail = $_SESSION['user_email'];
 
-// 獲取所有標籤
+// 獲取當前使用者ID
+$userId = $_SESSION['user_id'];
+
+// 正確獲取使用者標籤
+$userTags = getTags($userId);
+
+// 獲取所有可用標籤
 $allTags = getAllTags();
-
-// 獲取用戶標籤
-$userTags = getUserTags($userId);
-$userTagIds = array_column($userTags, 'id');
-
-$error = '';
-$success = '';
 
 // 處理表單提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? '';
+    // 處理標籤偏好更新
+    if (isset($_POST['update_preferences'])) {
+        // 獲取選擇的標籤ID數組
+        $selectedTags = isset($_POST['tags']) ? array_map('intval', $_POST['tags']) : [];
+        
+        // 更新使用者標籤關聯
+        $result = updateUserTags($userId, $selectedTags);
+        
+        // 設置提示訊息
+        $_SESSION['flash_message'] = $result['success'] ? '偏好設定已更新！' : '更新偏好設定失敗：' . $result['message'];
+        $_SESSION['flash_type'] = $result['success'] ? 'success' : 'danger';
+        
+        // 使用完整URL重新導向，並包含錨點
+        header('Location: ' . url('user_profile') . '#preferences');
+        exit;
+    }
     
-    // 處理更新標籤
-    if ($action === 'update_tags') {
-        $tagIds = isset($_POST['tags']) ? $_POST['tags'] : [];
-        
-        // 處理新增標籤
-        $newTag = trim($_POST['new_tag'] ?? '');
-        if (!empty($newTag)) {
-            $tagResult = createTag($newTag);
-            if ($tagResult['success'] && isset($tagResult['id'])) {
-                $tagIds[] = $tagResult['id'];
-            }
-        }
-        
-        // 更新用戶標籤
-        if (updateUserTags($userId, $tagIds)) {
-            $success = '偏好設定已成功更新';
-            $userTags = getUserTags($userId);
-            $userTagIds = array_column($userTags, 'id');
-        } else {
-            $error = '更新偏好設定時發生錯誤';
+    // 處理新增標籤
+    if (isset($_POST['add_tag']) && isset($_POST['tag_name'])) {
+        $tagName = trim($_POST['tag_name']);
+        if (!empty($tagName)) {
+            $result = createTag($tagName, $userId);
+            
+            $_SESSION['flash_message'] = $result['message'];
+            $_SESSION['flash_type'] = $result['success'] ? 'success' : 'danger';
+            
+            // 重新導向以避免重複提交
+            redirect('user_profile');
         }
     }
 }
@@ -156,5 +162,117 @@ include 'includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- 個人標籤偏好部分 -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">我的標籤偏好</h5>
+    </div>
+    <div class="card-body">
+        <!-- 顯示當前標籤 -->
+        <div class="mb-3">
+            <h6>我的標籤:</h6>
+            <?php if (empty($userTags)): ?>
+                <p class="text-muted">尚未設定任何標籤偏好</p>
+            <?php else: ?>
+                <div class="d-flex flex-wrap">
+                    <?php foreach ($userTags as $tag): ?>
+                        <span class="badge badge-primary mr-2 mb-2">
+                            <?php echo htmlspecialchars($tag['name']); ?>
+                        </span>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+        
+        <!-- 標籤偏好更新表單 -->
+        <form method="post" class="mt-3">
+            <h6>新增標籤:</h6>
+            <div class="input-group mb-3">
+                <input type="text" class="form-control" name="tag_name" placeholder="輸入標籤名稱">
+                <div class="input-group-append">
+                    <button type="submit" name="add_tag" class="btn btn-outline-primary">新增</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 添加id="preferences"以匹配錨點 -->
+<div id="preferences" class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">標籤偏好設定</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="<?php echo url('user_profile'); ?>#preferences">
+            <div class="form-group">
+                <label>選擇您喜愛的標籤：</label>
+                <div class="row">
+                    <?php 
+                    // 獲取使用者已選標籤的ID列表
+                    $userTagIds = array_map(function($tag) {
+                        return $tag['id'];
+                    }, $userTags);
+                    
+                    // 獲取所有標籤供選擇
+                    $allTags = getAllTags();
+                    
+                    foreach ($allTags as $tag): 
+                    ?>
+                        <div class="col-md-4 mb-2">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" 
+                                       class="custom-control-input" 
+                                       id="tag-<?php echo $tag['id']; ?>" 
+                                       name="tags[]" 
+                                       value="<?php echo $tag['id']; ?>"
+                                       <?php echo in_array($tag['id'], $userTagIds) ? 'checked' : ''; ?>>
+                                <label class="custom-control-label" for="tag-<?php echo $tag['id']; ?>">
+                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                </label>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            
+            <button type="submit" name="update_preferences" class="btn btn-primary">
+                儲存偏好設定
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- 添加頁面加載時自動滾動到錨點的JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 如果URL包含錨點，滾動到相應位置
+    if (window.location.hash) {
+        const targetElement = document.querySelector(window.location.hash);
+        if (targetElement) {
+            targetElement.scrollIntoView({
+                behavior: 'smooth'
+            });
+            
+            // 為目標區塊添加高亮效果
+            targetElement.classList.add('highlight-section');
+            setTimeout(function() {
+                targetElement.classList.remove('highlight-section');
+            }, 2000);
+        }
+    }
+});
+</script>
+
+<style>
+/* 添加高亮效果的樣式 */
+.highlight-section {
+    animation: highlight 2s;
+}
+@keyframes highlight {
+    0% { background-color: rgba(255, 255, 140, 0.5); }
+    100% { background-color: transparent; }
+}
+</style>
 
 <?php include 'includes/footer.php'; ?>

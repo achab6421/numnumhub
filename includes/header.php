@@ -1,14 +1,23 @@
 <?php
+require_once __DIR__ . '/init.php';
+
+// 添加標籤函數引用
+require_once dirname(__DIR__) . '/tags/functions.php';
+
+$isLoggedIn = isLoggedIn();
+
+// 如果是登入用戶，獲取使用者的標籤
+$userTags = [];
+if ($isLoggedIn && function_exists('getTags')) {
+    $userId = $_SESSION['user_id'] ?? null;
+    if ($userId) {
+        $userTags = getTags($userId);
+    }
+}
+
 // 確保有頁面標題
 if (!isset($pageTitle)) {
     $pageTitle = SITE_NAME;
-}
-
-// 如果用戶已登入，獲取他們的標籤
-$userTags = [];
-if (isLoggedIn() && file_exists(__DIR__ . '/../tags/functions.php')) {
-    require_once __DIR__ . '/../tags/functions.php';
-    $userTags = getUserTags($_SESSION['user_id']);
 }
 ?>
 <!DOCTYPE html>

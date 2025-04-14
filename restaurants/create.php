@@ -12,8 +12,12 @@ if (!isLoggedIn()) {
 $error = '';
 $success = '';
 
-// 獲取所有標籤用於選擇
-$allTags = getAllTags();
+// 獲取當前登入用戶ID
+$userId = $_SESSION['user_id'];
+
+// 獲取使用者的標籤作為選項
+// 原程式碼可能是: $tagOptions = getAllTags();
+$tagOptions = getTags($userId);
 
 // 處理表單提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -30,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 處理新增標籤
     $newTag = trim($_POST['new_tag'] ?? '');
     if (!empty($newTag)) {
-        $tagResult = createTag($newTag);
+        $tagResult = createTag($newTag, $userId);
         if ($tagResult['success'] && isset($tagResult['id'])) {
             $tagIds[] = $tagResult['id'];
         }
@@ -142,9 +146,9 @@ include_once __DIR__ . '/../includes/header.php';
                         <label>標籤</label>
                         <div class="card">
                             <div class="card-body">
-                                <?php if (!empty($allTags)): ?>
+                                <?php if (!empty($tagOptions)): ?>
                                     <div class="mb-3">
-                                        <?php foreach($allTags as $tag): ?>
+                                        <?php foreach($tagOptions as $tag): ?>
                                         <div class="custom-control custom-checkbox custom-control-inline">
                                             <input type="checkbox" class="custom-control-input" id="tag_<?php echo $tag['id']; ?>" name="tags[]" value="<?php echo $tag['id']; ?>">
                                             <label class="custom-control-label" for="tag_<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['name']); ?></label>
