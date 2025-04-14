@@ -33,7 +33,10 @@ if (!isset($pageTitle)) {
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="<?php echo url('index'); ?>"><?php echo SITE_NAME; ?></a>
+            <!-- 修改品牌連結，未登入時導向 index 而非 dashboard -->
+            <a class="navbar-brand" href="<?php echo $isLoggedIn ? url('dashboard') : url('index'); ?>">
+                <?php echo SITE_NAME; ?>
+            </a>
             <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>

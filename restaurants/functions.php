@@ -326,22 +326,44 @@ function getTagOptions($userId) {
 }
 
 /**
- * 更新餐廳的標籤關聯
+ * 更新餐廳的標籤關聯，只允許使用當前使用者的標籤
  * @param int $restaurantId 餐廳ID
  * @param array $tagIds 標籤ID數組
+ * @param int $userId 當前使用者ID，用於驗證標籤所有權
  * @return array 操作結果
  */
-function updateRestaurantTags($restaurantId, $tagIds = []) {
+function updateRestaurantTags($restaurantId, $tagIds = [], $userId = null) {
     global $conn;
+    
+    // 如果提供了使用者ID，則驗證標籤所有權
+    if ($userId) {
+        // 獲取使用者的標籤
+        $userTags = getTags($userId);
+        $userTagIds = array_column($userTags, 'id');
+        
+        // 過濾標籤ID，只保留屬於該使用者的標籤
+        $tagIds = array_intersect($tagIds, $userTagIds);
+    }
     
     // 啟用交易處理
     $conn->begin_transaction();
     
     try {
-        // 刪除該餐廳的所有現有標籤關聯
-        $deleteSql = "DELETE FROM restaurant_tags WHERE restaurant_id = ?";
-        $deleteStmt = $conn->prepare($deleteSql);
-        $deleteStmt->bind_param("i", $restaurantId);
+        // 刪除該餐廳與該使用者標籤的所有現有關聯
+        // 如果提供了使用者ID，可以加入條件只刪除屬於該使用者的標籤關聯
+        if ($userId) {
+            // 首先獲取要刪除的標籤關聯ID
+            $deleteSql = "DELETE rt FROM restaurant_tags rt 
+                         INNER JOIN user_tags ut ON rt.tag_id = ut.tag_id
+                         WHERE rt.restaurant_id = ? AND ut.user_id = ?";
+            $deleteStmt = $conn->prepare($deleteSql);
+            $deleteStmt->bind_param("ii", $restaurantId, $userId);
+        } else {
+            // 刪除所有標籤關聯
+            $deleteSql = "DELETE FROM restaurant_tags WHERE restaurant_id = ?";
+            $deleteStmt = $conn->prepare($deleteSql);
+            $deleteStmt->bind_param("i", $restaurantId);
+        }
         
         if (!$deleteStmt->execute()) {
             $conn->rollback();
