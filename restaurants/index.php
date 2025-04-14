@@ -149,11 +149,41 @@ include_once __DIR__ . '/../includes/header.php';
                     <td><?php echo htmlspecialchars($restaurant['phone'] ?? ''); ?></td>
                     <td>
                         <?php if (!empty($restaurant['tags'])): ?>
-                            <?php foreach($restaurant['tags'] as $tag): ?>
-                            <span class="badge badge-info mr-1">
-                                <?php echo htmlspecialchars($tag['name']); ?>
-                            </span>
-                            <?php endforeach; ?>
+                            <?php 
+                            $totalTags = count($restaurant['tags']);
+                            $hasMoreTags = $totalTags > 2;
+                            ?>
+                            
+                            <div class="restaurant-tags" id="tags-container-<?php echo $restaurant['id']; ?>">
+                                <!-- 始終顯示的前兩個標籤 -->
+                                <?php for($i = 0; $i < min(2, $totalTags); $i++): ?>
+                                <span class="badge badge-info mr-1">
+                                    <?php echo htmlspecialchars($restaurant['tags'][$i]['name']); ?>
+                                </span>
+                                <?php endfor; ?>
+                                
+                                <!-- 如果有更多標籤，顯示展開按鈕 -->
+                                <?php if ($hasMoreTags): ?>
+                                <button type="button" class="btn btn-sm text-primary p-0 ml-1 toggle-tags" 
+                                    data-restaurant-id="<?php echo $restaurant['id']; ?>"
+                                    data-action="expand"
+                                    title="顯示更多標籤">...</button>
+                                    
+                                <!-- 額外的標籤，初始隱藏 -->
+                                <div class="additional-tags d-none" id="additional-tags-<?php echo $restaurant['id']; ?>">
+                                    <?php for($i = 2; $i < $totalTags; $i++): ?>
+                                    <span class="badge badge-info mr-1">
+                                        <?php echo htmlspecialchars($restaurant['tags'][$i]['name']); ?>
+                                    </span>
+                                    <?php endfor; ?>
+                                    
+                                    <button type="button" class="btn btn-sm text-primary p-0 ml-1 toggle-tags" 
+                                        data-restaurant-id="<?php echo $restaurant['id']; ?>"
+                                        data-action="collapse"
+                                        title="收起標籤"><i class="fas fa-angle-up"></i></button>
+                                </div>
+                                <?php endif; ?>
+                            </div>
                         <?php else: ?>
                             <span class="text-muted">-</span>
                         <?php endif; ?>
@@ -464,6 +494,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // 展開/收起標籤
+    const tagToggleButtons = document.querySelectorAll('.toggle-tags');
+    tagToggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const restaurantId = this.getAttribute('data-restaurant-id');
+            const action = this.getAttribute('data-action');
+            const tagsContainer = document.getElementById('tags-container-' + restaurantId);
+            const additionalTags = document.getElementById('additional-tags-' + restaurantId);
+            
+            if (action === 'expand') {
+                additionalTags.classList.remove('d-none');
+                this.setAttribute('data-action', 'collapse');
+                this.innerHTML = '<i class="fas fa-angle-up"></i>';
+            } else {
+                additionalTags.classList.add('d-none');
+                this.setAttribute('data-action', 'expand');
+                this.innerHTML = '...';
+            }
+        });
+    });
 });
 </script>
 

@@ -14,11 +14,12 @@ $userId = $_SESSION['user_id'];
 $userName = $_SESSION['user_name'];
 $userEmail = $_SESSION['user_email'];
 
-// 獲取當前使用者ID
-$userId = $_SESSION['user_id'];
-
 // 正確獲取使用者標籤
 $userTags = getTags($userId);
+// 獲取使用者已選標籤的ID列表
+$userTagIds = array_map(function($tag) {
+    return $tag['id'];
+}, $userTags);
 
 // 獲取所有可用標籤
 $allTags = getAllTags();
@@ -78,8 +79,8 @@ include 'includes/header.php';
                 <p class="text-center text-muted"><?php echo htmlspecialchars($userEmail); ?></p>
                 
                 <div class="list-group mt-4">
-                    <a href="#profile" class="list-group-item list-group-item-action active" data-toggle="tab">個人資料</a>
-                    <a href="#preferences" class="list-group-item list-group-item-action" data-toggle="tab">偏好設定</a>
+                    <a href="#profile-section" class="list-group-item list-group-item-action active" data-toggle="tab">個人資料</a>
+                    <a href="#preferences-section" class="list-group-item list-group-item-action" data-toggle="tab">偏好設定</a>
                 </div>
             </div>
         </div>
@@ -88,7 +89,7 @@ include 'includes/header.php';
     <div class="col-md-9">
         <div class="tab-content">
             <!-- 個人資料標籤 -->
-            <div class="tab-pane fade show active" id="profile">
+            <div class="tab-pane fade show active" id="profile-section">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
                         <h5 class="m-0">個人資料設定</h5>
@@ -110,136 +111,73 @@ include 'includes/header.php';
             </div>
             
             <!-- 偏好設定標籤 -->
-            <div class="tab-pane fade" id="preferences">
-                <div class="card">
+            <div class="tab-pane fade" id="preferences-section">
+                <!-- 標籤偏好設定 -->
+                <div id="preferences" class="card">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="m-0">偏好設定</h5>
+                        <h5 class="mb-0">標籤偏好設定</h5>
                     </div>
                     <div class="card-body">
-                        <?php if (!empty($error)): ?>
-                            <div class="alert alert-danger"><?php echo $error; ?></div>
-                        <?php endif; ?>
+                        <!-- 顯示當前標籤 -->
+                        <div class="mb-3">
+                            <h6>我的標籤:</h6>
+                            <?php if (empty($userTags)): ?>
+                                <p class="text-muted">尚未設定任何標籤偏好</p>
+                            <?php else: ?>
+                                <div class="d-flex flex-wrap">
+                                    <?php foreach ($userTags as $tag): ?>
+                                        <span class="badge badge-primary mr-2 mb-2">
+                                            <?php echo htmlspecialchars($tag['name']); ?>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                         
-                        <?php if (!empty($success)): ?>
-                            <div class="alert alert-success"><?php echo $success; ?></div>
-                        <?php endif; ?>
-                        
-                        <form action="<?php echo url('user_profile'); ?>" method="post">
-                            <input type="hidden" name="action" value="update_tags">
-                            
+                        <!-- 新增標籤表單 -->
+                        <form method="post" class="mb-4">
+                            <h6>新增標籤:</h6>
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control" name="tag_name" placeholder="輸入標籤名稱">
+                                <div class="input-group-append">
+                                    <button type="submit" name="add_tag" class="btn btn-outline-primary">新增</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <hr>
+
+                        <!-- 標籤偏好更新表單 -->
+                        <form method="post" action="<?php echo url('user_profile'); ?>#preferences">
                             <div class="form-group">
-                                <label>我的美食偏好標籤</label>
-                                <div class="card">
-                                    <div class="card-body">
-                                        <?php if (!empty($allTags)): ?>
-                                            <div class="mb-3">
-                                                <?php foreach($allTags as $tag): ?>
-                                                <div class="custom-control custom-checkbox custom-control-inline">
-                                                    <input type="checkbox" class="custom-control-input" id="tag_<?php echo $tag['id']; ?>" name="tags[]" value="<?php echo $tag['id']; ?>" <?php echo in_array($tag['id'], $userTagIds) ? 'checked' : ''; ?>>
-                                                    <label class="custom-control-label" for="tag_<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['name']); ?></label>
-                                                </div>
-                                                <?php endforeach; ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" name="new_tag" placeholder="新增標籤">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text"><i class="fas fa-plus"></i></span>
+                                <label>選擇您喜愛的標籤：</label>
+                                <div class="row">
+                                    <?php foreach ($allTags as $tag): ?>
+                                        <div class="col-md-4 mb-2">
+                                            <div class="custom-control custom-checkbox">
+                                                <input type="checkbox" 
+                                                       class="custom-control-input" 
+                                                       id="tag-<?php echo $tag['id']; ?>" 
+                                                       name="tags[]" 
+                                                       value="<?php echo $tag['id']; ?>"
+                                                       <?php echo in_array($tag['id'], $userTagIds) ? 'checked' : ''; ?>>
+                                                <label class="custom-control-label" for="tag-<?php echo $tag['id']; ?>">
+                                                    <?php echo htmlspecialchars($tag['name']); ?>
+                                                </label>
                                             </div>
                                         </div>
-                                        <small class="form-text text-muted">您的偏好標籤將顯示在導航欄，幫助您更容易找到喜愛的食物</small>
-                                    </div>
+                                    <?php endforeach; ?>
                                 </div>
                             </div>
                             
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-primary">保存設定</button>
-                            </div>
+                            <button type="submit" name="update_preferences" class="btn btn-primary">
+                                儲存偏好設定
+                            </button>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<!-- 個人標籤偏好部分 -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">我的標籤偏好</h5>
-    </div>
-    <div class="card-body">
-        <!-- 顯示當前標籤 -->
-        <div class="mb-3">
-            <h6>我的標籤:</h6>
-            <?php if (empty($userTags)): ?>
-                <p class="text-muted">尚未設定任何標籤偏好</p>
-            <?php else: ?>
-                <div class="d-flex flex-wrap">
-                    <?php foreach ($userTags as $tag): ?>
-                        <span class="badge badge-primary mr-2 mb-2">
-                            <?php echo htmlspecialchars($tag['name']); ?>
-                        </span>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
-        </div>
-        
-        <!-- 標籤偏好更新表單 -->
-        <form method="post" class="mt-3">
-            <h6>新增標籤:</h6>
-            <div class="input-group mb-3">
-                <input type="text" class="form-control" name="tag_name" placeholder="輸入標籤名稱">
-                <div class="input-group-append">
-                    <button type="submit" name="add_tag" class="btn btn-outline-primary">新增</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- 添加id="preferences"以匹配錨點 -->
-<div id="preferences" class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">標籤偏好設定</h5>
-    </div>
-    <div class="card-body">
-        <form method="post" action="<?php echo url('user_profile'); ?>#preferences">
-            <div class="form-group">
-                <label>選擇您喜愛的標籤：</label>
-                <div class="row">
-                    <?php 
-                    // 獲取使用者已選標籤的ID列表
-                    $userTagIds = array_map(function($tag) {
-                        return $tag['id'];
-                    }, $userTags);
-                    
-                    // 獲取所有標籤供選擇
-                    $allTags = getAllTags();
-                    
-                    foreach ($allTags as $tag): 
-                    ?>
-                        <div class="col-md-4 mb-2">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" 
-                                       class="custom-control-input" 
-                                       id="tag-<?php echo $tag['id']; ?>" 
-                                       name="tags[]" 
-                                       value="<?php echo $tag['id']; ?>"
-                                       <?php echo in_array($tag['id'], $userTagIds) ? 'checked' : ''; ?>>
-                                <label class="custom-control-label" for="tag-<?php echo $tag['id']; ?>">
-                                    <?php echo htmlspecialchars($tag['name']); ?>
-                                </label>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            
-            <button type="submit" name="update_preferences" class="btn btn-primary">
-                儲存偏好設定
-            </button>
-        </form>
     </div>
 </div>
 
@@ -259,6 +197,11 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
                 targetElement.classList.remove('highlight-section');
             }, 2000);
+        }
+        
+        // 如果錨點為 #preferences，激活對應的標籤
+        if (window.location.hash === '#preferences') {
+            document.querySelector('a[href="#preferences-section"]').click();
         }
     }
 });

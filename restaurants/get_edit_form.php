@@ -29,7 +29,21 @@ if (!canManageRestaurant($id, $_SESSION['user_id'])) {
 // 獲取所有標籤和餐廳已有標籤
 $allTags = getAllTags();
 $restaurantTags = getRestaurantTags($id);
-$restaurantTagIds = array_column($restaurantTags, 'id');
+
+// 直接構建ID數組，不使用array_column
+$restaurantTagIds = [];
+foreach ($restaurantTags as $tag) {
+    if (isset($tag['id'])) {
+        $restaurantTagIds[] = $tag['id'];
+    } else if (isset($tag['tag_id'])) {
+        // 如果返回的是tag_id字段而不是id字段
+        $restaurantTagIds[] = $tag['tag_id'];
+    }
+}
+
+// 添加調試信息 (開發時使用，正式環境請移除)
+// echo '<pre>餐廳標籤：'; print_r($restaurantTags); echo '</pre>';
+// echo '<pre>標籤ID：'; print_r($restaurantTagIds); echo '</pre>';
 ?>
 
 <form id="editRestaurantForm">
@@ -56,21 +70,68 @@ $restaurantTagIds = array_column($restaurantTags, 'id');
     </div>
     
     <div class="form-group">
-        <label>標籤</label>
         <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">餐廳標籤</h5>
+            </div>
             <div class="card-body">
                 <?php if (!empty($allTags)): ?>
-                    <div class="mb-3">
-                        <?php foreach($allTags as $tag): ?>
-                        <div class="custom-control custom-checkbox custom-control-inline">
-                            <input type="checkbox" class="custom-control-input" id="tag_<?php echo $tag['id']; ?>" name="tags[]" value="<?php echo $tag['id']; ?>" <?php echo in_array($tag['id'], $restaurantTagIds) ? 'checked' : ''; ?>>
-                            <label class="custom-control-label" for="tag_<?php echo $tag['id']; ?>"><?php echo htmlspecialchars($tag['name']); ?></label>
+                    <div class="mb-3 tag-cloud" id="tagContainer">
+                        <?php 
+                        // 計算標籤總數
+                        $totalTags = count($allTags);
+                        // 對標籤進行分組（每行4個）
+                        $tagGroups = array_chunk($allTags, 4);
+                        // 是否需要展開/收起功能（超過2組，即8個標籤）
+                        $needsExpanding = $totalTags > 8;
+                        ?>
+                        
+                        <?php foreach ($tagGroups as $index => $tagGroup): 
+                            // 只有前2組顯示，其他隱藏
+                            $rowClass = $index >= 2 ? 'tag-row-hidden' : '';
+                        ?>
+                        <div class="row mb-2 tag-row <?php echo $rowClass; ?>">
+                            <?php foreach ($tagGroup as $tag): 
+                                $isChecked = in_array($tag['id'], $restaurantTagIds);
+                            ?>
+                                <div class="col-md-3 col-sm-6 mb-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" 
+                                            class="form-check-input" 
+                                            id="tag_<?php echo $tag['id']; ?>" 
+                                            name="tags[]" 
+                                            value="<?php echo $tag['id']; ?>"
+                                            <?php echo $isChecked ? 'checked="checked"' : ''; ?>>
+                                        <label class="form-check-label tag-label <?php echo $isChecked ? 'tag-selected' : ''; ?>" 
+                                            for="tag_<?php echo $tag['id']; ?>">
+                                            <?php echo htmlspecialchars($tag['name']); ?>
+                                        </label>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                         <?php endforeach; ?>
+                        
+                        <?php if ($needsExpanding): ?>
+                        <div class="text-center mt-2">
+                            <button type="button" class="btn btn-sm btn-link toggle-tags" id="showMoreTags">
+                                <i class="fas fa-ellipsis-h"></i> 顯示更多標籤 (還有 <?php echo $totalTags - 8; ?> 個)
+                            </button>
+                            <button type="button" class="btn btn-sm btn-link toggle-tags d-none" id="showLessTags">
+                                <i class="fas fa-chevron-up"></i> 收起標籤
+                            </button>
+                        </div>
+                        <?php endif; ?>
                     </div>
+                <?php else: ?>
+                    <p class="text-muted">目前沒有可用的標籤</p>
                 <?php endif; ?>
-                <div class="input-group">
-                    <input type="text" class="form-control" name="new_tag" placeholder="新增標籤">
+                
+                <div class="input-group mt-3">
+                    <input type="text" class="form-control" name="new_tag" id="new_tag" placeholder="輸入新標籤名稱">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" id="addNewTagBtn">新增標籤</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -81,3 +142,39 @@ $restaurantTagIds = array_column($restaurantTags, 'id');
         <textarea class="form-control" id="note" name="note" rows="3"><?php echo htmlspecialchars($restaurant['note'] ?? ''); ?></textarea>
     </div>
 </form>
+
+<style>
+.tag-label {
+    transition: all 0.2s;
+    border-radius: 3px;
+    padding: 2px 5px;
+}
+.tag-selected {
+    background-color: #e9f5ff;
+    font-weight: 500;
+}
+.form-check:hover .tag-label {
+    background-color: #f0f8ff;
+}
+.tag-cloud {
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 為新增標籤按鈕添加點擊事件
+    document.getElementById('addNewTagBtn').addEventListener('click', function() {
+        const newTagInput = document.getElementById('new_tag');
+        if (newTagInput.value.trim() !== '') {
+            // 這裡可以添加視覺反饋，表明標籤已添加
+            newTagInput.classList.add('is-valid');
+            setTimeout(function() {
+                newTagInput.classList.remove('is-valid');
+            }, 2000);
+        }
+    });
+});
+</script>
