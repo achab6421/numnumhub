@@ -147,33 +147,6 @@ include 'includes/header.php';
 
                         <hr>
 
-                        <!-- 標籤偏好更新表單 -->
-                        <form method="post" action="<?php echo url('user_profile'); ?>#preferences">
-                            <div class="form-group">
-                                <label>選擇您喜愛的標籤：</label>
-                                <div class="row">
-                                    <?php foreach ($allTags as $tag): ?>
-                                        <div class="col-md-4 mb-2">
-                                            <div class="custom-control custom-checkbox">
-                                                <input type="checkbox" 
-                                                       class="custom-control-input" 
-                                                       id="tag-<?php echo $tag['id']; ?>" 
-                                                       name="tags[]" 
-                                                       value="<?php echo $tag['id']; ?>"
-                                                       <?php echo in_array($tag['id'], $userTagIds) ? 'checked' : ''; ?>>
-                                                <label class="custom-control-label" for="tag-<?php echo $tag['id']; ?>">
-                                                    <?php echo htmlspecialchars($tag['name']); ?>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                            
-                            <button type="submit" name="update_preferences" class="btn btn-primary">
-                                儲存偏好設定
-                            </button>
-                        </form>
                     </div>
                 </div>
             </div>
