@@ -77,7 +77,7 @@ $routes = [
         'auth' => true,
         'title' => '活動管理'
     ],
-    'event' => [
+    'event-info' => [
         'file' => 'event_detail.php',
         'auth' => true,
         'title' => '活動詳情'
@@ -122,6 +122,27 @@ $routes = [
         'file' => 'user_profile.php',
         'auth' => true,
         'title' => '個人資料設定'
+    ],
+    // 點餐系統相關路由
+    'order-system' => [
+        'file' => 'order_system.php',
+        'auth' => true,
+        'title' => '活動點餐系統'
+    ],
+    'add-order' => [
+        'file' => 'orders/add_order.php',
+        'auth' => true,
+        'title' => '新增餐點'
+    ],
+    'delete-order' => [
+        'file' => 'orders/delete_order.php',
+        'auth' => true,
+        'title' => '刪除餐點'
+    ],
+    'copy-order' => [
+        'file' => 'orders/copy_order.php',
+        'auth' => true,
+        'title' => '複製餐點'
     ]
 ];
 

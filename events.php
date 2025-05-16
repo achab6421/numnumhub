@@ -75,7 +75,7 @@ include_once 'includes/header.php';
             <?php if ($created_result->num_rows > 0): ?>
                 <div class="list-group">
                     <?php while ($event = $created_result->fetch_assoc()): ?>
-                        <a href="<?php echo url('event', ['id' => $event['id']]); ?>" class="list-group-item list-group-item-action">
+                        <div class="list-group-item">
                             <div class="d-flex w-100 justify-content-between">
                                 <h5 class="mb-1"><?php echo htmlspecialchars($event['title']); ?></h5>
                                 <small>
@@ -89,7 +89,12 @@ include_once 'includes/header.php';
                             <small>
                                 截止時間：<?php echo date('Y-m-d H:i', strtotime($event['deadline'])); ?>
                             </small>
-                        </a>
+                            <div class="btn-group">
+                                <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-utensils"></i> 進入點餐
+                                </a>
+                            </div>
+                        </div>
                     <?php endwhile; ?>
                 </div>
             <?php else: ?>
@@ -104,7 +109,7 @@ include_once 'includes/header.php';
             <?php if ($joined_result->num_rows > 0): ?>
                 <div class="list-group">
                     <?php while ($event = $joined_result->fetch_assoc()): ?>
-                        <a href="<?php echo url('event', ['id' => $event['id']]); ?>" class="list-group-item list-group-item-action">
+                        <div class="list-group-item">
                             <div class="d-flex w-100 justify-content-between">
                                 <h5 class="mb-1"><?php echo htmlspecialchars($event['title']); ?></h5>
                                 <small>
@@ -118,7 +123,12 @@ include_once 'includes/header.php';
                             <small>
                                 截止時間：<?php echo date('Y-m-d H:i', strtotime($event['deadline'])); ?>
                             </small>
-                        </a>
+                            <div>
+                                <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-utensils"></i> 進入點餐
+                                </a>
+                            </div>
+                        </div>
                     <?php endwhile; ?>
                 </div>
             <?php else: ?>

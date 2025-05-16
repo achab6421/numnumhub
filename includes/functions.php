@@ -121,31 +121,75 @@ function getCurrentRoute() {
 }
 
 /**
- * 根據路由名稱和參數生成URL
- * @param string $route 路由名稱
- * @param array $params URL參數
- * @return string 格式化的URL
+ * 設置快閃訊息 - 用於頁面間的消息傳遞
+ * 
+ * @param string $message 訊息內容
+ * @param string $type 訊息類型 (success, error, warning, info)
+ * @return void
  */
-function url($route, $params = []) {
-    // 確保使用正確的BASE_URL常數
-    if (!defined('BASE_URL')) {
-        define('BASE_URL', '/numnumhub/');
+function setFlashMessage($message, $type = 'info') {
+    if (!isset($_SESSION)) {
+        session_start();
     }
     
-    // 基礎URL
-    $url = BASE_URL . $route;
-    
-    // 如果有ID參數，使用 /{id} 格式（RESTful風格）
-    if (isset($params['id'])) {
-        $id = $params['id'];
-        unset($params['id']);
-        $url .= '/' . $id;
+    $_SESSION['flash_message'] = $message;
+    $_SESSION['flash_type'] = $type;
+}
+
+/**
+ * 獲取快閃訊息
+ * 
+ * @return array|null 包含 message 和 type 的陣列，或 null
+ */
+function getFlashMessage() {
+    if (!isset($_SESSION)) {
+        session_start();
     }
     
-    // 添加其他查詢參數
+    if (isset($_SESSION['flash_message']) && isset($_SESSION['flash_type'])) {
+        $message = $_SESSION['flash_message'];
+        $type = $_SESSION['flash_type'];
+        
+        // 清除訊息，避免重複顯示
+        unset($_SESSION['flash_message']);
+        unset($_SESSION['flash_type']);
+        
+        return [
+            'message' => $message,
+            'type' => $type
+        ];
+    }
+    
+    return null;
+}
+
+/**
+ * 簡化 URL 生成並支援查詢參數
+ * 
+ * @param string $route 路由名稱
+ * @param array $params 參數陣列
+ * @return string 完整 URL
+ */
+function url($route = '', $params = []) {
+    $baseUrl = isset($GLOBALS['baseUrl']) ? $GLOBALS['baseUrl'] : '';
+    
+    // 調整 route 為空時的處理
+    $url = $baseUrl . ($route ? $route : '');
+    
+    // 處理非關聯陣列的查詢參數（例如 ['id' => 1]）
     if (!empty($params)) {
-        $url .= '?' . http_build_query($params);
+        $queryParts = [];
+        foreach ($params as $key => $value) {
+            if (is_string($key)) {
+                $queryParts[] = urlencode($key) . '=' . urlencode($value);
+            }
+        }
+        
+        if (!empty($queryParts)) {
+            $url .= '?' . implode('&', $queryParts);
+        }
     }
+    
     return $url;
 }
 

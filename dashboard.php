@@ -135,6 +135,9 @@ include 'includes/header.php';
                                     </td>
                                     <td>
                                         <a href="<?php echo url('event', ['id' => $event['id']]); ?>" class="btn btn-sm btn-info">查看</a>
+                                        <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-utensils"></i> 點餐系統
+                                        </a>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -181,6 +184,9 @@ include 'includes/header.php';
                                     </div>
                                     <div class="card-footer text-center">
                                         <a href="<?php echo url('event', ['id' => $joinedEvent['id']]); ?>" class="btn btn-sm btn-info">進入活動</a>
+                                        <a href="<?php echo url('order-system', ['id' => $joinedEvent['id']]); ?>" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-utensils"></i> 進入點餐
+                                        </a>
                                     </div>
                                 </div>
                             </div>

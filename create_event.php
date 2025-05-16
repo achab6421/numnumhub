@@ -66,8 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $title = $description = $date = $time = '';
                 $restaurant_id = 0;
                 
-                // 重定向到活動詳情頁
-                redirect('event', ['id' => $event_id]);
+                // 重定向到點餐系統
+                redirect('order-system', ['id' => $event_id]);
             } else {
                 $error = "建立活動時發生錯誤: " . $conn->error;
             }

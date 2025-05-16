@@ -310,9 +310,35 @@ function canManageRestaurant($restaurant_id, $user_id) {
  * @param string $message 訊息內容
  * @param string $type 訊息類型 (success, danger, warning, info)
  */
-function setFlashMessage($message, $type = 'success') {
-    $_SESSION['flash_message'] = $message;
-    $_SESSION['flash_type'] = $type;
+if (!function_exists('setFlashMessage')) {
+    function setFlashMessage($message, $type = 'success') {
+        $_SESSION['flash_message'] = $message;
+        $_SESSION['flash_type'] = $type;
+    }
+}
+
+/**
+ * 獲取提示訊息
+ * @return array|null 包含訊息內容和類型的陣列，或null
+ */
+if (!function_exists('getFlashMessage')) {
+    function getFlashMessage() {
+        if (isset($_SESSION['flash_message']) && isset($_SESSION['flash_type'])) {
+            $message = $_SESSION['flash_message'];
+            $type = $_SESSION['flash_type'];
+            
+            // 清除訊息，避免重複顯示
+            unset($_SESSION['flash_message']);
+            unset($_SESSION['flash_type']);
+            
+            return [
+                'message' => $message,
+                'type' => $type
+            ];
+        }
+        
+        return null;
+    }
 }
 
 /**
