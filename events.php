@@ -86,13 +86,25 @@ include_once 'includes/header.php';
                                 地點：<?php echo htmlspecialchars($event['restaurant_name']); ?> | 
                                 參加人數：<?php echo (int)$event['participant_count']; ?>
                             </p>
-                            <small>
-                                截止時間：<?php echo date('Y-m-d H:i', strtotime($event['deadline'])); ?>
-                            </small>
-                            <div class="btn-group">
-                                <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-utensils"></i> 進入點餐
-                                </a>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <small>
+                                    截止時間：<?php echo $event['deadline'] ? date('Y-m-d H:i', strtotime($event['deadline'])) : '無限期'; ?>
+                                    <?php if ($event['is_closed']): ?>
+                                        <span class="badge badge-danger">已關閉</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-success">進行中</span>
+                                    <?php endif; ?>
+                                </small>
+                                <div class="btn-group">
+                                    <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-primary btn-sm">
+                                        <i class="fas fa-utensils"></i> 點餐系統
+                                    </a>
+                                    <?php if (!$event['is_closed'] && $event['creator_id'] == $user_id): ?>
+                                        <a href="<?php echo url('edit-event', ['id' => $event['id']]); ?>" class="btn btn-outline-secondary btn-sm">
+                                            <i class="fas fa-edit"></i> 編輯
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
                             </div>
                         </div>
                     <?php endwhile; ?>

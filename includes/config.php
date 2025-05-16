@@ -143,6 +143,12 @@ $routes = [
         'file' => 'orders/copy_order.php',
         'auth' => true,
         'title' => '複製餐點'
+    ],
+    // 確保有加入關閉活動的路由
+    'close-event' => [
+        'file' => 'close_event.php',
+        'auth' => true,
+        'title' => '關閉活動'
     ]
 ];
 

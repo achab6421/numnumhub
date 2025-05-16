@@ -153,30 +153,36 @@ include_once 'includes/header.php';
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="m-0">活動資訊</h5>
                     
-                    <?php if (!$event['is_closed']): ?>
-                        <div>
-                            <?php if ($event['is_creator']): ?>
-                                <button class="btn btn-sm btn-light" data-toggle="modal" data-target="#shareCodeModal">
-                                    <i class="fas fa-share-alt"></i> 分享碼
-                                </button>
-                                <a href="<?php echo url('edit-event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
-                                    <i class="fas fa-edit"></i> 編輯
-                                </a>
-                                <button class="btn btn-sm btn-danger" data-toggle="modal" data-target="#closeEventModal">
-                                    <i class="fas fa-times-circle"></i> 關閉活動
-                                </button>
-                            <?php endif; ?>
-                            <a href="<?php echo url('event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
-                                <i class="fas fa-info-circle"></i> 活動詳情
+                    <div>
+                        <?php if ($event['is_creator']): ?>
+                            <button class="btn btn-sm btn-light" data-toggle="modal" data-target="#shareCodeModal">
+                                <i class="fas fa-share-alt"></i> 分享碼
+                            </button>
+                            <a href="<?php echo url('edit-event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
+                                <i class="fas fa-edit"></i> 編輯
                             </a>
-                        </div>
-                    <?php endif; ?>
+                        <?php endif; ?>
+                        <a href="<?php echo url('event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
+                            <i class="fas fa-info-circle"></i> 活動詳情
+                        </a>
+                    </div>
                 </div>
                 
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-7">
                             <h5><?php echo htmlspecialchars($event['title']); ?></h5>
+                            
+                            <!-- 添加活動狀態的清晰顯示 -->
+                            <?php if ($event['is_closed']): ?>
+                                <div class="alert alert-warning mb-3">
+                                    <i class="fas fa-lock"></i> <strong>此活動已關閉</strong> - 不再接受新的點餐
+                                </div>
+                            <?php else: ?>
+                                <div class="alert alert-success mb-3">
+                                    <i class="fas fa-check-circle"></i> <strong>此活動進行中</strong> - 可以繼續點餐
+                                </div>
+                            <?php endif; ?>
                             
                             <p>
                                 <i class="fas fa-store text-primary"></i> 
@@ -475,25 +481,30 @@ include_once 'includes/header.php';
                     <h5 class="m-0">活動操作</h5>
                 </div>
                 <div class="card-body">
-                    <?php if (!$event['is_closed']): ?>
-                        <?php if ($event['is_creator']): ?>
-                            <button class="btn btn-danger btn-block mb-2" data-toggle="modal" data-target="#closeEventModal">
-                                <i class="fas fa-times-circle"></i> 關閉活動
-                            </button>
-                        <?php endif; ?>
-                        
-                        <?php if (!$event['is_creator']): ?>
-                            <form action="<?php echo url('leave'); ?>" method="post" onsubmit="return confirm('確定要退出此活動嗎？這將刪除您的所有點餐記錄');">
-                                <input type="hidden" name="event_id" value="<?php echo $event_id; ?>">
-                                <button type="submit" class="btn btn-outline-danger btn-block mb-2">
-                                    <i class="fas fa-sign-out-alt"></i> 退出活動
+                    <?php if ($event['is_creator']): ?>
+                        <form action="<?php echo url('close-event'); ?>" method="post" class="mb-2">
+                            <input type="hidden" name="event_id" value="<?php echo $event_id; ?>">
+                            <?php if ($event['is_closed']): ?>
+                                <input type="hidden" name="action" value="reopen">
+                                <button type="submit" class="btn btn-success btn-block" onclick="return confirm('確定要重新開啟此活動嗎？')">
+                                    <i class="fas fa-lock-open"></i> 重新開啟活動
                                 </button>
-                            </form>
-                        <?php endif; ?>
-                    <?php else: ?>
-                        <div class="alert alert-secondary text-center">
-                            <i class="fas fa-lock"></i> 此活動已關閉
-                        </div>
+                            <?php else: ?>
+                                <input type="hidden" name="action" value="close">
+                                <button type="submit" class="btn btn-danger btn-block" onclick="return confirm('確定要關閉此活動嗎？關閉後其他人將無法再點餐')">
+                                    <i class="fas fa-lock"></i> 關閉活動
+                                </button>
+                            <?php endif; ?>
+                        </form>
+                    <?php endif; ?>
+                    
+                    <?php if (!$event['is_creator'] && !$event['is_closed']): ?>
+                        <form action="<?php echo url('leave'); ?>" method="post" class="mb-2" onsubmit="return confirm('確定要退出此活動嗎？這將刪除您的所有點餐記錄');">
+                            <input type="hidden" name="event_id" value="<?php echo $event_id; ?>">
+                            <button type="submit" class="btn btn-outline-danger btn-block">
+                                <i class="fas fa-sign-out-alt"></i> 退出活動
+                            </button>
+                        </form>
                     <?php endif; ?>
                     
                     <a href="<?php echo url('events'); ?>" class="btn btn-outline-secondary btn-block">
@@ -533,35 +544,6 @@ include_once 'includes/header.php';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
-<!-- 關閉活動模態框 -->
-<?php if ($event['is_creator'] && !$event['is_closed']): ?>
-<div class="modal fade" id="closeEventModal" tabindex="-1" role="dialog" aria-labelledby="closeEventModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="closeEventModalLabel">關閉活動</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <p>確定要關閉此活動嗎？關閉後將無法再新增餐點。</p>
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> 此操作無法撤銷！
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
-                <form action="<?php echo url('close-event'); ?>" method="post">
-                    <input type="hidden" name="event_id" value="<?php echo $event_id; ?>">
-                    <button type="submit" class="btn btn-danger">確定關閉</button>
-                </form>
             </div>
         </div>
     </div>
