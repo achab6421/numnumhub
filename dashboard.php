@@ -113,9 +113,17 @@ include 'includes/header.php';
                                     <td><?php echo htmlspecialchars($event['restaurant_name']); ?></td>
                                     <td><span class="badge badge-info"><?php echo (int)$event['participant_count']; ?></span></td>
                                     <td>
-                                        <span class="badge badge-warning" style="letter-spacing: 2px;">
-                                            <?php echo $event['share_code'] ? htmlspecialchars($event['share_code']) : '無'; ?>
-                                        </span>
+                                        <?php if ($event['share_code']): ?>
+                                            <span class="badge badge-warning copy-code" 
+                                                  style="letter-spacing: 2px; cursor: pointer;" 
+                                                  data-toggle="tooltip" 
+                                                  title="點擊複製" 
+                                                  data-code="<?php echo htmlspecialchars($event['share_code']); ?>">
+                                                <?php echo htmlspecialchars($event['share_code']); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge badge-secondary">無</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td><?php echo $event['deadline'] ? date('m/d H:i', strtotime($event['deadline'])) : '無限期'; ?></td>
                                     <td>
@@ -219,3 +227,48 @@ include 'includes/header.php';
 </div>
 
 <?php include 'includes/footer.php'; ?>
+
+<!-- 添加用於複製功能的 JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化 Bootstrap 的 tooltip
+    $('[data-toggle="tooltip"]').tooltip();
+    
+    // 為所有帶有 copy-code 類的元素添加點擊事件
+    document.querySelectorAll('.copy-code').forEach(function(element) {
+        element.addEventListener('click', function() {
+            // 獲取要複製的代碼
+            var code = this.getAttribute('data-code');
+            
+            // 創建一個臨時的 textarea 元素
+            var textarea = document.createElement('textarea');
+            textarea.value = code;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            
+            // 選中並複製文本
+            textarea.select();
+            document.execCommand('copy');
+            
+            // 從 DOM 中移除臨時元素
+            document.body.removeChild(textarea);
+            
+            // 更改工具提示內容，並顯示
+            var originalTitle = this.getAttribute('data-original-title');
+            $(this).tooltip('hide')
+                .attr('data-original-title', '已複製！')
+                .tooltip('show');
+            
+            // 閃爍效果，顯示複製成功
+            this.classList.add('bg-success');
+            setTimeout(() => {
+                this.classList.remove('bg-success');
+                $(this).tooltip('hide')
+                    .attr('data-original-title', originalTitle);
+            }, 1000);
+        });
+    });
+});
+</script>
