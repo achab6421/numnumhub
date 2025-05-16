@@ -16,7 +16,7 @@ $restaurantResult = $restaurantStmt->get_result();
 $restaurantCount = $restaurantResult->fetch_assoc()['restaurant_count'];
 
 // 獲取使用者創建的活動數量
-$eventQuery = "SELECT COUNT(*) AS event_count FROM events WHERE created_at = ?";
+$eventQuery = "SELECT COUNT(*) AS event_count FROM events WHERE creator_id = ?";
 $eventStmt = $conn->prepare($eventQuery);
 $eventStmt->bind_param("i", $_SESSION['user_id']);
 $eventStmt->execute();
@@ -24,16 +24,34 @@ $eventResult = $eventStmt->get_result();
 $eventCount = $eventResult->fetch_assoc()['event_count'];
 
 // 獲取最近的活動
-$recentEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created_at, e.is_closed 
-                    FROM events e 
-                    JOIN restaurants r ON e.restaurant_id = r.id 
-                    WHERE e.created_at = ? 
-                    ORDER BY e.created_at DESC 
-                    LIMIT 5";
+$recentEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created_at, e.is_closed, 
+                      e.share_code, e.deadline,
+                      (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS participant_count
+                      FROM events e 
+                      JOIN restaurants r ON e.restaurant_id = r.id 
+                      WHERE e.creator_id = ? 
+                      ORDER BY e.created_at DESC 
+                      LIMIT 5";
 $recentEventsStmt = $conn->prepare($recentEventsQuery);
 $recentEventsStmt->bind_param("i", $_SESSION['user_id']);
 $recentEventsStmt->execute();
 $recentEvents = $recentEventsStmt->get_result();
+
+// 獲取使用者參與的活動
+$joinedEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created_at, e.is_closed,
+                      u.name AS creator_name, e.share_code, e.deadline,
+                      (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS participant_count
+                      FROM events e
+                      JOIN event_participants ep ON e.id = ep.event_id
+                      JOIN restaurants r ON e.restaurant_id = r.id
+                      JOIN users u ON e.creator_id = u.id
+                      WHERE ep.user_id = ? AND e.creator_id != ?
+                      ORDER BY ep.joined_at DESC
+                      LIMIT 3";
+$joinedEventsStmt = $conn->prepare($joinedEventsQuery);
+$joinedEventsStmt->bind_param("ii", $_SESSION['user_id'], $_SESSION['user_id']);
+$joinedEventsStmt->execute();
+$joinedEvents = $joinedEventsStmt->get_result();
 
 include 'includes/header.php';
 ?>
@@ -81,7 +99,9 @@ include 'includes/header.php';
                             <tr>
                                 <th>活動名稱</th>
                                 <th>餐廳</th>
-                                <th>建立時間</th>
+                                <th>參與人數</th>
+                                <th>分享碼</th>
+                                <th>截止時間</th>
                                 <th>狀態</th>
                                 <th></th>
                             </tr>
@@ -91,7 +111,13 @@ include 'includes/header.php';
                                 <tr>
                                     <td><?php echo htmlspecialchars($event['title']); ?></td>
                                     <td><?php echo htmlspecialchars($event['restaurant_name']); ?></td>
-                                    <td><?php echo date('Y-m-d', strtotime($event['created_at'])); ?></td>
+                                    <td><span class="badge badge-info"><?php echo (int)$event['participant_count']; ?></span></td>
+                                    <td>
+                                        <span class="badge badge-warning" style="letter-spacing: 2px;">
+                                            <?php echo $event['share_code'] ? htmlspecialchars($event['share_code']) : '無'; ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo $event['deadline'] ? date('m/d H:i', strtotime($event['deadline'])) : '無限期'; ?></td>
                                     <td>
                                         <?php if ($event['is_closed']): ?>
                                             <span class="badge badge-secondary">已關閉</span>
@@ -111,8 +137,50 @@ include 'includes/header.php';
                 <?php endif; ?>
             </div>
             <div class="card-footer">
-                <!-- 修正建立活動連結 -->
                 <a href="<?php echo url('create-event'); ?>" class="btn btn-success">建立新活動</a>
+                <a href="<?php echo url('events'); ?>" class="btn btn-outline-success">查看所有活動</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card border-secondary">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="m-0">我參與的活動</h5>
+            </div>
+            <div class="card-body">
+                <?php if ($joinedEvents->num_rows > 0): ?>
+                    <div class="row">
+                        <?php while ($joinedEvent = $joinedEvents->fetch_assoc()): ?>
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100 <?php echo $joinedEvent['is_closed'] ? 'border-secondary' : 'border-info'; ?>">
+                                    <div class="card-header <?php echo $joinedEvent['is_closed'] ? 'bg-secondary' : 'bg-info'; ?> text-white">
+                                        <h6 class="m-0 text-truncate" title="<?php echo htmlspecialchars($joinedEvent['title']); ?>">
+                                            <?php echo htmlspecialchars($joinedEvent['title']); ?>
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text">
+                                            <strong>餐廳:</strong> <?php echo htmlspecialchars($joinedEvent['restaurant_name']); ?><br>
+                                            <strong>創建者:</strong> <?php echo htmlspecialchars($joinedEvent['creator_name']); ?><br>
+                                            <strong>參與人數:</strong> <?php echo (int)$joinedEvent['participant_count']; ?><br>
+                                            <?php if ($joinedEvent['deadline']): ?>
+                                                <strong>截止時間:</strong> <?php echo date('m/d H:i', strtotime($joinedEvent['deadline'])); ?>
+                                            <?php endif; ?>
+                                        </p>
+                                    </div>
+                                    <div class="card-footer text-center">
+                                        <a href="<?php echo url('event', ['id' => $joinedEvent['id']]); ?>" class="btn btn-sm btn-info">進入活動</a>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endwhile; ?>
+                    </div>
+                <?php else: ?>
+                    <p class="text-center py-3">您尚未參與任何活動。</p>
+                <?php endif; ?>
             </div>
         </div>
     </div>
