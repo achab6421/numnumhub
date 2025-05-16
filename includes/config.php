@@ -97,6 +97,11 @@ $routes = [
         'auth' => false,
         'title' => '加入活動'
     ],
+    'join-by-code' => [
+        'file' => 'join_by_code.php',
+        'auth' => true,
+        'title' => '透過分享碼加入活動'
+    ],
     
     // 資料庫更新路由
     'update_restaurant_table' => [

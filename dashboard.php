@@ -16,7 +16,7 @@ $restaurantResult = $restaurantStmt->get_result();
 $restaurantCount = $restaurantResult->fetch_assoc()['restaurant_count'];
 
 // 獲取使用者創建的活動數量
-$eventQuery = "SELECT COUNT(*) AS event_count FROM events WHERE created_by = ?";
+$eventQuery = "SELECT COUNT(*) AS event_count FROM events WHERE created_at = ?";
 $eventStmt = $conn->prepare($eventQuery);
 $eventStmt->bind_param("i", $_SESSION['user_id']);
 $eventStmt->execute();
@@ -27,7 +27,7 @@ $eventCount = $eventResult->fetch_assoc()['event_count'];
 $recentEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created_at, e.is_closed 
                     FROM events e 
                     JOIN restaurants r ON e.restaurant_id = r.id 
-                    WHERE e.created_by = ? 
+                    WHERE e.created_at = ? 
                     ORDER BY e.created_at DESC 
                     LIMIT 5";
 $recentEventsStmt = $conn->prepare($recentEventsQuery);
@@ -140,7 +140,7 @@ include 'includes/header.php';
                     </div>
                     <div class="col-md-4 mb-3">
                         <!-- 修正加入活動連結 -->
-                        <a href="<?php echo url('join'); ?>" class="btn btn-outline-info btn-lg btn-block">
+                        <a href="<?php echo url('join-by-code'); ?>" class="btn btn-outline-info btn-lg btn-block">
                             <i class="fas fa-sign-in-alt"></i> 加入活動
                         </a>
                     </div>

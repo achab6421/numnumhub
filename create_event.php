@@ -16,8 +16,102 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // 表單處理邏輯將在這裡實現
-    // ...
+    // 獲取表單數據
+    $title = trim($_POST['title'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $date = trim($_POST['date'] ?? '');
+    $time = trim($_POST['time'] ?? '');
+    $restaurant_id = (int)($_POST['restaurant_id'] ?? 0);
+    $creator_id = $_SESSION['user_id'];
+    
+    // 基本驗證
+    if (empty($title)) {
+        $error = "活動名稱不能為空";
+    } elseif (empty($date)) {
+        $error = "活動日期不能為空";
+    } elseif (empty($time)) {
+        $error = "截止時間不能為空";
+    } elseif ($restaurant_id <= 0) {
+        $error = "請選擇一個餐廳";
+    } else {
+        try {
+            // 直接使用全局連接變數
+            global $conn;
+            
+            // 創建DateTime對象來處理日期時間
+            $deadline = $date . ' ' . $time . ':00';
+            
+            // 生成唯一的分享碼
+            $share_code = generateUniqueShareCode($conn);
+            
+            // 準備SQL語句
+            $sql = "INSERT INTO events (title, description, restaurant_id, creator_id, deadline, share_code, created_at) 
+                    VALUES (?, ?, ?, ?, ?, ?, NOW())";
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ssiiss", $title, $description, $restaurant_id, $creator_id, $deadline, $share_code);
+            // 執行查詢
+            if ($stmt->execute()) {
+                $event_id = $conn->insert_id;
+                $success = "活動已成功建立！";
+                
+                // 自動將建立者加入活動
+                $joinSql = "INSERT INTO event_participants (event_id, user_id, joined_at) VALUES (?, ?, NOW())";
+                $joinStmt = $conn->prepare($joinSql);
+                $joinStmt->bind_param("ii", $event_id, $creator_id);
+                $joinStmt->execute();
+                $joinStmt->close();
+                
+                // 清除表單數據，避免重複提交
+                $title = $description = $date = $time = '';
+                $restaurant_id = 0;
+                
+                // 重定向到活動詳情頁
+                redirect('event', ['id' => $event_id]);
+            } else {
+                $error = "建立活動時發生錯誤: " . $conn->error;
+            }
+            
+            // 關閉語句
+            $stmt->close();
+            
+        } catch (Exception $e) {
+            $error = "系統錯誤：" . $e->getMessage();
+        }
+    }
+}
+
+/**
+ * 生成唯一的活動分享碼
+ * @param mysqli $conn 資料庫連接
+ * @return string 生成的分享碼
+ */
+function generateUniqueShareCode($conn) {
+    $characters = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $maxAttempts = 10; // 嘗試生成唯一碼的最大次數
+    
+    for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+        // 生成6位隨機碼
+        $code = '';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $characters[rand(0, strlen($characters) - 1)];
+        }
+        
+        // 檢查是否已存在
+        $stmt = $conn->prepare("SELECT id FROM events WHERE share_code = ?");
+        $stmt->bind_param("s", $code);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 0) {
+            $stmt->close();
+            return $code; // 返回唯一碼
+        }
+        $stmt->close();
+    }
+    
+    // 如果嘗試多次都無法生成唯一碼，則使用時間戳加隨機數
+    return 'E' . strtoupper(substr(md5(time() . rand(1000, 9999)), 0, 5));
 }
 
 // 頁面標題
