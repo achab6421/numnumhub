@@ -60,10 +60,10 @@ if (!function_exists('loginUser')) {
                 
                 return ["success" => true, "message" => "登入成功！"];
             } else {
-                return ["success" => false, "message" => "密碼不正確"];
+                return ["success" => false, "message" => "帳密錯誤或找不到用戶"];
             }
         } else {
-            return ["success" => false, "message" => "查無此用戶"];
+            return ["success" => false, "message" => "帳密錯誤或找不到用戶"];
         }
     }
 }

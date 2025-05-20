@@ -96,7 +96,7 @@ include_once 'includes/header.php';
                         <div class="form-group">
                             <label for="share_code">活動分享碼</label>
                             <input type="text" class="form-control form-control-lg text-center" id="share_code" name="share_code" 
-                                   placeholder="請輸入6位分享碼" maxlength="6" style="letter-spacing: 5px;" required>
+                                   placeholder="請輸入6位分享碼" maxlength="6" style="letter-spacing: 5px;"  required>
                             <small class="form-text text-muted">請輸入6位活動分享碼，不區分大小寫</small>
                         </div>
                         
@@ -109,5 +109,14 @@ include_once 'includes/header.php';
         </div>
     </div>
 </div>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code'); // 抓取 ?code= 後的值
+  if (code) {
+    document.getElementById('share_code').value = code;
+  }
+});
+                    </script>
 
 <?php include_once 'includes/footer.php'; ?>

@@ -555,6 +555,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化工具提示
     $('[data-toggle="tooltip"]').tooltip();
     
+    // 修正複製功能 - 確保選擇器正確並綁定事件
+    document.querySelectorAll('.copy-code').forEach(function(element) {
+        element.addEventListener('click', function() {
+            const code = this.getAttribute('data-code');
+            console.log('Copying code:', code); // 用於偵錯
+            copyToClipboard(code, this);
+        });
+    });
+    
+    // 複製連結按鈕 - 修正事件處理
+    const copyLinkButton = document.getElementById('copyLink');
+    if (copyLinkButton) {
+        copyLinkButton.addEventListener('click', function() {
+            const link = document.getElementById('shareLink').value;
+            console.log('Copying link:', link); // 用於偵錯
+            copyToClipboard(link, this);
+        });
+    }
+    
     // 表單驗證
     (function() {
         'use strict';
@@ -572,19 +591,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }, false);
     })();
     
-    // 複製功能
-    document.querySelectorAll('.copy-code').forEach(function(element) {
-        element.addEventListener('click', function() {
-            const code = this.getAttribute('data-code');
-            copyToClipboard(code, this);
-        });
-    });
+    // 複製到剪貼簿功能 - 使用更可靠的方法
+    function copyToClipboard(text, element) {
+        // 檢查現代瀏覽器API
+        if (navigator.clipboard && window.isSecureContext) {
+            // 使用現代 Clipboard API
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showCopySuccess(element);
+                })
+                .catch(err => {
+                    console.error('無法複製: ', err);
+                    fallbackCopyMethod(text, element);
+                });
+        } else {
+            // 回退到舊方法
+            fallbackCopyMethod(text, element);
+        }
+    }
     
-    // 複製連結按鈕
-    document.getElementById('copyLink')?.addEventListener('click', function() {
-        const link = document.getElementById('shareLink').value;
-        copyToClipboard(link, this);
-    });
+    // 回退的複製方法
+    function fallbackCopyMethod(text, element) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        
+        // 確保 textarea 在視窗內並可見
+        textarea.style.top = '0';
+        textarea.focus();
+        textarea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showCopySuccess(element);
+            } else {
+                console.error('複製失敗');
+                alert('複製失敗，請手動複製');
+            }
+        } catch (err) {
+            console.error('複製過程中出錯: ', err);
+            alert('複製過程中出錯，請手動複製');
+        }
+        
+        document.body.removeChild(textarea);
+    }
+    
+    // 顯示複製成功UI
+    function showCopySuccess(element) {
+        // 顯示成功提示
+        const originalTooltip = element.getAttribute('data-original-title') || '點擊複製';
+        $(element).tooltip('hide')
+            .attr('data-original-title', '已複製！')
+            .tooltip('show');
+            
+        // 閃爍效果
+        element.classList.add('text-success');
+        setTimeout(() => {
+            element.classList.remove('text-success');
+            $(element).tooltip('hide')
+                .attr('data-original-title', originalTooltip);
+        }, 1500);
+    }
     
     // 按用戶分組切換
     document.getElementById('toggleGroupByUser')?.addEventListener('click', function() {
@@ -673,34 +744,6 @@ document.addEventListener('DOMContentLoaded', function() {
             groupButton.innerHTML = '<i class="fas fa-users"></i> 依用戶分組';
         });
     });
-    
-    // 複製到剪貼簿功能
-    function copyToClipboard(text, element) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', '');
-        textarea.style.position = 'absolute';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        
-        // 顯示成功提示
-        const originalTooltip = element.getAttribute('data-original-title');
-        $(element).tooltip('hide')
-            .attr('data-original-title', '已複製！')
-            .tooltip('show');
-            
-        // 閃爍效果
-        element.classList.add('text-success');
-        setTimeout(() => {
-            element.classList.remove('text-success');
-            $(element).tooltip('hide')
-                .attr('data-original-title', originalTooltip || '點擊複製');
-        }, 1500);
-    }
 });
 </script>
 
