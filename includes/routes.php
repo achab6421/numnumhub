@@ -1,3 +1,4 @@
+```php
 <?php
 // 編輯餐廳頁面
 require_once dirname(__DIR__) . '/includes/init.php';
@@ -258,12 +259,14 @@ include_once dirname(__DIR__) . '/includes/header.php';
                                                     </div>
                                                     <div class="card-body p-2 text-center">
                                                         <small class="text-muted d-block mb-2">上傳於: <?php echo date('Y-m-d H:i', strtotime($image['created_at'])); ?></small>
-                                                        <!-- 改為使用按鈕並帶有 data 屬性，而不是嵌套表單 -->
-                                                        <button type="button" class="btn btn-sm btn-danger delete-image-btn"
-                                                                data-image-id="<?php echo $image['id']; ?>"
-                                                                data-restaurant-id="<?php echo $id; ?>">
-                                                            <i class="fas fa-trash"></i> 刪除
-                                                        </button>
+                                                        <form method="post" action="<?php echo url('delete-restaurant-image'); ?>" 
+                                                              onsubmit="return confirm('確定要刪除此圖片嗎？此操作不可恢復');">
+                                                            <input type="hidden" name="image_id" value="<?php echo $image['id']; ?>">
+                                                            <input type="hidden" name="restaurant_id" value="<?php echo $id; ?>">
+                                                            <button type="submit" class="btn btn-sm btn-danger delete-image">
+                                                                <i class="fas fa-trash"></i> 刪除
+                                                            </button>
+                                                        </form>
                                                     </div>
                                                 </div>
                                             </div>
@@ -387,76 +390,6 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#imagePreviewModal').modal('show');
     });
     
-    // 使用 AJAX 刪除圖片
-    $(document).on('click', '.delete-image-btn', function() {
-        const btn = $(this);
-        const imageId = btn.data('image-id');
-        const restaurantId = btn.data('restaurant-id');
-        
-        if (confirm('確定要刪除此圖片嗎？此操作不可恢復')) {
-            // 顯示刪除中的提示
-            const card = btn.closest('.card');
-            const originalContent = card.html();
-            card.html('<div class="text-center p-5"><div class="spinner-border text-primary" role="status"><span class="sr-only">刪除中...</span></div><p class="mt-2">正在刪除...</p></div>');
-            
-            // 發送 AJAX 請求
-            $.ajax({
-                url: '<?php echo url("api-delete-restaurant-image"); ?>',
-                type: 'POST',
-                data: {
-                    image_id: imageId,
-                    restaurant_id: restaurantId
-                },
-                dataType: 'json',
-                success: function(response) {
-                    if (response.success) {
-                        // 從 DOM 中移除圖片卡片
-                        btn.closest('.col-md-4').fadeOut(300, function() {
-                            $(this).remove();
-                            
-                            // 檢查是否還有其他圖片
-                            if ($('#existing_images .col-md-4').length === 0) {
-                                $('#existing_images').html('<div class="col-12"><div class="alert alert-info">所有菜單圖片已被刪除</div></div>');
-                            }
-                            
-                            // 更新圖片數量標題
-                            const imagesCount = $('#existing_images .col-md-4').length;
-                            $('#existing_images').closest('.card').find('.card-header h5').text('現有菜單圖片 (' + imagesCount + ' 張)');
-                        });
-                        
-                        // 顯示成功訊息
-                        const alertHtml = 
-                            '<div class="alert alert-success alert-dismissible fade show mt-3" role="alert">' +
-                            '  <strong>成功！</strong> ' + response.message +
-                            '  <button type="button" class="close" data-dismiss="alert" aria-label="Close">' +
-                            '    <span aria-hidden="true">&times;</span>' +
-                            '  </button>' +
-                            '</div>';
-                        
-                        $('#existing_images').before(alertHtml);
-                        
-                        // 3秒後自動淡出提示
-                        setTimeout(function() {
-                            $('.alert-success').fadeOut(300, function() {
-                                $(this).remove();
-                            });
-                        }, 3000);
-                    } else {
-                        // 還原卡片並顯示錯誤訊息
-                        card.html(originalContent);
-                        alert('刪除失敗：' + response.message);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    // 還原卡片並顯示錯誤訊息
-                    card.html(originalContent);
-                    console.error('AJAX Error:', status, error);
-                    alert('發生錯誤，無法刪除圖片。請檢查網絡連接並重試。');
-                }
-            });
-        }
-    });
-    
     // 初始化 lightbox
     if (typeof lightbox !== 'undefined') {
         lightbox.option({
@@ -486,3 +419,4 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <?php include_once dirname(__DIR__) . '/includes/footer.php'; ?>
+```

@@ -26,6 +26,9 @@ if (!canManageRestaurant($id, $_SESSION['user_id'])) {
     exit;
 }
 
+// 獲取餐廳的菜單圖片
+$menu_images = getRestaurantImages($id);
+
 // 獲取所有標籤和餐廳已有標籤
 $allTags = getAllTags();
 $restaurantTags = getRestaurantTags($id);
@@ -141,7 +144,77 @@ foreach ($restaurantTags as $tag) {
         <label for="note">備註</label>
         <textarea class="form-control" id="note" name="note" rows="3"><?php echo htmlspecialchars($restaurant['note'] ?? ''); ?></textarea>
     </div>
+    
+    <!-- 新增圖片上傳區域 -->
+    <div class="form-group">
+        <label for="menu_images">餐廳菜單圖片</label>
+        <div class="custom-file">
+            <input type="file" class="custom-file-input" id="menu_images" name="menu_images[]" accept="image/*" multiple>
+            <label class="custom-file-label" for="menu_images">選擇圖片檔案...</label>
+        </div>
+        <small class="form-text text-muted">
+            您可以選擇多個圖片檔案一次上傳。支援的格式: JPG, JPEG, PNG, GIF
+        </small>
+    </div>
+    
+    <!-- 圖片預覽區域 -->
+    <div id="image_preview" class="d-flex flex-wrap mt-2 mb-3">
+        <!-- 預覽圖片將顯示在這裡 -->
+    </div>
+    
+    <!-- 顯示現有的餐廳菜單圖片 -->
+    <?php if (!empty($menu_images)): ?>
+    <div class="form-group">
+        <label>現有菜單圖片</label>
+        <div class="row" id="existing_images">
+            <?php foreach ($menu_images as $image): ?>
+                <div class="col-md-4 col-sm-6 mb-3" data-image-id="<?php echo $image['id']; ?>">
+                    <div class="card h-100">
+                        <!-- 修改圖片點擊方式，使其能夠在modal內正常工作 -->
+                        <div class="image-preview-container">
+                            <img src="/<?php echo htmlspecialchars($image['image_path']); ?>" 
+                                 class="card-img-top preview-image" alt="菜單圖片" 
+                                 data-img-src="/<?php echo htmlspecialchars($image['image_path']); ?>"
+                                 data-img-title="<?php echo htmlspecialchars($image['description'] ?? '菜單圖片'); ?>"
+                                 style="height: 150px; object-fit: cover;">
+                            <div class="image-overlay">
+                                <i class="fas fa-search-plus"></i>
+                            </div>
+                        </div>
+                        <div class="card-body p-2 text-center">
+                            <small class="text-muted d-block mb-2">上傳於: <?php echo date('Y-m-d H:i', strtotime($image['created_at'])); ?></small>
+                            <button type="button" class="btn btn-sm btn-danger delete-image" data-image-id="<?php echo $image['id']; ?>">
+                                <i class="fas fa-trash"></i> 刪除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php else: ?>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> 此餐廳尚未上傳任何菜單圖片
+    </div>
+    <?php endif; ?>
 </form>
+
+<!-- 修改預覽模態框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" role="dialog" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imagePreviewModalTitle">圖片預覽</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="previewImage" src="" alt="圖片預覽" style="max-width: 100%; max-height: 70vh;">
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
 .tag-label {
@@ -161,9 +234,57 @@ foreach ($restaurantTags as $tag) {
     overflow-y: auto;
     padding-right: 5px;
 }
+.tag-row-hidden {
+    display: none;
+}
+
+/* 圖片預覽相關樣式 */
+.image-preview-container {
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.image-overlay i {
+    color: white;
+    font-size: 2rem;
+}
+
+.image-preview-container:hover .image-overlay {
+    opacity: 1;
+}
 </style>
 
 <script>
+// 圖片預覽函數
+function previewImage(src, title) {
+    console.log('Preview Image:', src, title); // 調試日誌
+    const previewModal = document.getElementById('imagePreviewModal');
+    const previewImage = document.getElementById('previewImage');
+    const previewTitle = document.getElementById('imagePreviewModalTitle');
+    
+    // 設置模態框內容
+    previewImage.src = src;
+    previewTitle.textContent = title || '圖片預覽';
+    
+    // 使用 jQuery 顯示模態框
+    $('#imagePreviewModal').modal('show');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // 為新增標籤按鈕添加點擊事件
     document.getElementById('addNewTagBtn').addEventListener('click', function() {
@@ -176,5 +297,207 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 2000);
         }
     });
+    
+    // 標籤展開/收起功能
+    const showMoreBtn = document.getElementById('showMoreTags');
+    const showLessBtn = document.getElementById('showLessTags');
+    const hiddenRows = document.querySelectorAll('.tag-row-hidden');
+    
+    if (showMoreBtn) {
+        showMoreBtn.addEventListener('click', function() {
+            hiddenRows.forEach(row => row.style.display = 'flex');
+            showMoreBtn.classList.add('d-none');
+            showLessBtn.classList.remove('d-none');
+        });
+    }
+    
+    if (showLessBtn) {
+        showLessBtn.addEventListener('click', function() {
+            hiddenRows.forEach(row => row.style.display = 'none');
+            showLessBtn.classList.add('d-none');
+            showMoreBtn.classList.remove('d-none');
+        });
+    }
+    
+    // 文件上傳預覽
+    document.getElementById('menu_images').addEventListener('change', function(e) {
+        const preview = document.getElementById('image_preview');
+        preview.innerHTML = '';
+        
+        if (this.files) {
+            const maxFiles = 10; // 最大文件數量
+            const maxSize = 5 * 1024 * 1024; // 5MB，最大檔案大小
+            
+            if (this.files.length > maxFiles) {
+                alert(`最多只能上傳 ${maxFiles} 張圖片`);
+                this.value = '';
+                return;
+            }
+            
+            Array.from(this.files).forEach(file => {
+                if (file.size > maxSize) {
+                    alert(`檔案 ${file.name} 超過 5MB 大小限制`);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'mr-2 mb-2 position-relative';
+                    div.style.width = '120px';
+                    div.style.height = '120px';
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'img-thumbnail';
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    img.style.cursor = 'pointer';
+                    
+                    // 添加圖片點擊事件
+                    img.onclick = function() {
+                        previewImage(this.src, file.name);
+                    };
+                    
+                    div.appendChild(img);
+                    preview.appendChild(div);
+                }
+                reader.readAsDataURL(file);
+            });
+            
+            // 更新 custom file label
+            const label = this.nextElementSibling;
+            label.textContent = this.files.length > 1 ? 
+                `已選擇 ${this.files.length} 張圖片` : 
+                this.files[0].name;
+        }
+    });
+    
+    // 為所有圖片預覽容器綁定點擊事件（直接使用事件委託方式）
+    document.addEventListener('click', function(event) {
+        const container = event.target.closest('.image-preview-container');
+        if (container) {
+            const src = container.getAttribute('data-img-src');
+            const title = container.getAttribute('data-img-title');
+            if (src) {
+                previewImage(src, title);
+                event.preventDefault();
+            }
+        }
+    });
+    
+    // 確保模態框正確初始化
+    try {
+        if(typeof $.fn.modal === 'function') {
+            $('#imagePreviewModal').modal({
+                show: false
+            });
+        } else {
+            console.error('Bootstrap modal plugin not available');
+        }
+    } catch (e) {
+        console.error('Error initializing modal:', e);
+    }
+    
+    // 刪除圖片功能
+    document.querySelectorAll('.delete-image').forEach(button => {
+        button.addEventListener('click', function() {
+            if(confirm('確定要刪除此圖片嗎？')) {
+                const imageId = this.getAttribute('data-image-id');
+                const restaurantId = <?php echo $id; ?>;
+                
+                // 發送 AJAX 請求刪除圖片
+                fetch('/index.php?route=api-delete-restaurant-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `image_id=${imageId}&restaurant_id=${restaurantId}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 從 DOM 中移除圖片
+                        document.querySelector(`#existing_images div[data-image-id="${imageId}"]`).remove();
+                        
+                        // 如果沒有圖片了，顯示提示
+                        if (document.querySelectorAll('#existing_images div[data-image-id]').length === 0) {
+                            document.getElementById('existing_images').innerHTML = `
+                                <div class="col-12">
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i> 此餐廳已無任何菜單圖片
+                                    </div>
+                                </div>
+                            `;
+                        }
+                        
+                        // 顯示成功訊息
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+                        alertDiv.innerHTML = `
+                            <button type="button" class="close" data-dismiss="alert">&times;</button>
+                            圖片已成功刪除
+                        `;
+                        document.getElementById('existing_images').parentNode.insertBefore(alertDiv, document.getElementById('existing_images'));
+                        
+                        // 自動關閉提示
+                        setTimeout(() => {
+                            alertDiv.classList.remove('show');
+                            setTimeout(() => alertDiv.remove(), 300);
+                        }, 3000);
+                    } else {
+                        alert('刪除圖片失敗：' + (data.message || '未知錯誤'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('刪除圖片時發生錯誤');
+                });
+            }
+        });
+    });
+});
+</script>
+
+<!-- 確保在bootstrap模態窗口內部正確運作的臨時解決方案 -->
+<script>
+// 使用jQuery處理模態窗口內的預覽功能
+$(document).ready(function() {
+    // 確保Bootstrap模態框已經初始化
+    if ($('#imagePreviewModal').length) {
+        $('#imagePreviewModal').modal({show: false});
+    }
+    
+    // 直接綁定事件到圖片，不管它是在哪裡
+    $(document).on('click', '.preview-image', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const src = $(this).data('img-src');
+        const title = $(this).data('img-title') || '圖片預覽';
+        
+        $('#imagePreviewModalTitle').text(title);
+        $('#previewImage').attr('src', src);
+        $('#imagePreviewModal').modal('show');
+    });
+});
+</script>
+
+<!-- 確保 jQuery 和 Bootstrap JS 被載入 -->
+<script>
+// 檢查是否已載入jQuery和Bootstrap
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof jQuery === 'undefined') {
+        console.error('jQuery is not loaded!');
+    } else {
+        console.log('jQuery is loaded, version: ' + jQuery.fn.jquery);
+    }
+    
+    if (typeof jQuery.fn.modal === 'undefined') {
+        console.error('Bootstrap modal is not loaded!');
+    } else {
+        console.log('Bootstrap modal is loaded');
+    }
 });
 </script>

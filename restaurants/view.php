@@ -42,6 +42,9 @@ $eventCount = 0;
 // 獲取餐廳標籤
 $restaurantTags = getRestaurantTags($id);
 
+// 獲取餐廳菜單圖片
+$menu_images = getRestaurantImages($id);
+
 // 設置頁面標題
 $pageTitle = htmlspecialchars($restaurant['name']);
 include_once __DIR__ . '/../includes/header.php';
@@ -166,32 +169,204 @@ include_once __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
-<!-- SweetAlert刪除功能 -->
+<!-- 菜單圖片區塊 -->
+<?php 
+$menu_images = getRestaurantImages($id);
+if (!empty($menu_images)): 
+?>
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="fas fa-images"></i> 菜單圖片</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <?php foreach ($menu_images as $image): ?>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <div class="card h-100">
+                    <div class="image-preview-container" 
+                         data-img-src="/<?php echo htmlspecialchars($image['image_path']); ?>"
+                         data-img-title="菜單圖片">
+                        <img src="/<?php echo htmlspecialchars($image['image_path']); ?>" 
+                             class="card-img-top" alt="菜單圖片" 
+                             style="height: 200px; object-fit: cover;">
+                        <div class="image-overlay">
+                            <i class="fas fa-search-plus"></i>
+                        </div>
+                    </div>
+                    <?php if (canManageRestaurant($id, $_SESSION['user_id'])): ?>
+                    <div class="card-footer p-2 text-center">
+                        <small class="text-muted">上傳於 <?php echo date('Y-m-d', strtotime($image['created_at'])); ?></small>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+</div>
+
+<!-- 圖片預覽模態框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imagePreviewModalTitle">菜單圖片</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="previewImage" src="" class="img-fluid" alt="菜單圖片預覽" style="max-width: 100%; max-height: 80vh;">
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- 上傳圖片模態窗口 -->
+<?php if ($restaurant['created_by'] == $_SESSION['user_id']): ?>
+<div class="modal fade" id="uploadImagesModal" tabindex="-1" role="dialog" aria-labelledby="uploadImagesModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="uploadImagesModalLabel">上傳菜單圖片</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="<?php echo url('upload-restaurant-images'); ?>" method="post" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" name="restaurant_id" value="<?php echo $restaurant_id; ?>">
+                    
+                    <div class="form-group">
+                        <label for="menu_images_upload">選擇菜單圖片 (可多選)</label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="menu_images_upload" name="menu_images[]" accept="image/*" multiple required>
+                            <label class="custom-file-label" for="menu_images_upload">選擇圖片檔案...</label>
+                        </div>
+                        <small class="form-text text-muted">
+                            您可以選擇多個圖片檔案一次上傳。支援的格式: JPG, JPEG, PNG, GIF
+                        </small>
+                    </div>
+                    
+                    <div id="image_preview_modal" class="d-flex flex-wrap mt-3">
+                        <!-- 預覽圖片將顯示在這裡 -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">上傳圖片</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const deleteButtons = document.querySelectorAll('.delete-restaurant-btn');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const restaurantId = this.getAttribute('data-id');
-            const restaurantName = this.getAttribute('data-name');
+    // 模態框中的文件上傳預覽
+    document.getElementById('menu_images_upload')?.addEventListener('change', function(e) {
+        const preview = document.getElementById('image_preview_modal');
+        preview.innerHTML = '';
+        
+        if (this.files) {
+            const maxFiles = 10; // 最大文件數量
+            const maxSize = 5 * 1024 * 1024; // 5MB，最大檔案大小
             
-            Swal.fire({
-                title: '確定要刪除此餐廳嗎?',
-                text: `您將刪除 "${restaurantName}"，此操作無法復原！`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: '是的，刪除它!',
-                cancelButtonText: '取消'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = `<?php echo url('delete-restaurant'); ?>?id=${restaurantId}`;
+            if (this.files.length > maxFiles) {
+                alert(`最多只能上傳 ${maxFiles} 張圖片`);
+                this.value = '';
+                return;
+            }
+            
+            Array.from(this.files).forEach(file => {
+                if (file.size > maxSize) {
+                    alert(`檔案 ${file.name} 超過 5MB 大小限制`);
+                    return;
                 }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const div = document.createElement('div');
+                    div.className = 'mr-2 mb-2 position-relative';
+                    div.style.width = '100px';
+                    div.style.height = '100px';
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'img-thumbnail';
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    img.style.objectFit = 'cover';
+                    
+                    div.appendChild(img);
+                    preview.appendChild(div);
+                }
+                reader.readAsDataURL(file);
             });
+            
+            // 更新 custom file label 顯示選擇的檔案數量
+            const label = this.nextElementSibling;
+            label.textContent = this.files.length > 1 ? 
+                `已選擇 ${this.files.length} 張圖片` : 
+                this.files[0].name;
+        }
+    });
+    
+    // 初始化 lightbox
+    lightbox.option({
+        'resizeDuration': 200,
+        'wrapAround': true,
+        'albumLabel': "圖片 %1 / %2"
+    });
+    
+    // 圖片預覽功能
+    document.querySelectorAll('.image-preview-container').forEach(function(container) {
+        container.addEventListener('click', function() {
+            const imgSrc = this.getAttribute('data-img-src');
+            const imgTitle = this.getAttribute('data-img-title') || '菜單圖片';
+            
+            document.getElementById('imagePreviewModalTitle').textContent = imgTitle;
+            document.getElementById('previewImage').src = imgSrc;
+            
+            $('#imagePreviewModal').modal('show');
         });
     });
 });
 </script>
+
+<style>
+.image-preview-container {
+    position: relative;
+    cursor: pointer;
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.image-overlay i {
+    color: white;
+    font-size: 2rem;
+}
+
+.image-preview-container:hover .image-overlay {
+    opacity: 1;
+}
+</style>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>

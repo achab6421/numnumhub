@@ -68,7 +68,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 設置閃存訊息
             setFlashMessage($result['message'], 'success');
             
+            // 處理多張圖片上傳
+            $uploadResults = handleMultipleImageUpload($result['id']);
+            if (!empty($uploadResults['errors'])) {
+                $error = implode('<br>', $uploadResults['errors']);
+            } else if ($uploadResults['count'] > 0) {
+                $success = "餐廳創建成功，並上傳了 {$uploadResults['count']} 張菜單圖片！";
+            } else {
+                $success = '餐廳創建成功！';
+            }
+            
             // 重定向到餐廳列表頁面
+            $_SESSION['flash_message'] = $success;
+            $_SESSION['flash_type'] = 'success';
             redirect('restaurants');
         } else {
             $error = $result['message'];
@@ -103,7 +115,7 @@ include_once __DIR__ . '/../includes/header.php';
                     <div class="alert alert-success"><?php echo $success; ?></div>
                 <?php endif; ?>
                 
-                <form id="restaurantForm" action="<?php echo url('create-restaurant'); ?>" method="post">
+                <form id="restaurantForm" action="<?php echo url('create-restaurant'); ?>" method="post" enctype="multipart/form-data">
                     <div class="form-group">
                         <label for="name">餐廳名稱 <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="name" name="name" required>
@@ -171,6 +183,21 @@ include_once __DIR__ . '/../includes/header.php';
                         <label for="note">備註</label>
                         <textarea class="form-control" id="note" name="note" rows="3"></textarea>
                         <small class="form-text text-muted">可填寫營業時間、菜單連結等資訊</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="menu_images">上傳菜單圖片 (可多選)</label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="menu_images" name="menu_images[]" accept="image/*" multiple>
+                            <label class="custom-file-label" for="menu_images">選擇圖片檔案...</label>
+                        </div>
+                        <small class="form-text text-muted">
+                            您可以選擇多個圖片檔案一次上傳。支援的格式: JPG, JPEG, PNG, GIF
+                        </small>
+                    </div>
+                    
+                    <div id="image_preview" class="d-flex flex-wrap mt-2 mb-4">
+                        <!-- 預覽圖片將顯示在這裡 -->
                     </div>
                     
                     <div class="form-group text-center">

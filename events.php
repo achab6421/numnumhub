@@ -51,9 +51,21 @@ include_once 'includes/header.php';
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0">活動管理</h1>
-        <a href="<?php echo url('create-event'); ?>" class="btn btn-primary">
-            <i class="fas fa-plus"></i> 建立新活動
-        </a>
+        <div>
+            <div class="btn-group mr-2">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-filter"></i> 篩選
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item <?php echo !isset($_GET['filter']) || $_GET['filter'] === 'all' ? 'active' : ''; ?>" href="<?php echo url('events', ['filter' => 'all']); ?>">全部活動</a>
+                    <a class="dropdown-item <?php echo isset($_GET['filter']) && $_GET['filter'] === 'active' ? 'active' : ''; ?>" href="<?php echo url('events', ['filter' => 'active']); ?>">進行中活動</a>
+                    <a class="dropdown-item <?php echo isset($_GET['filter']) && $_GET['filter'] === 'closed' ? 'active' : ''; ?>" href="<?php echo url('events', ['filter' => 'closed']); ?>">已結束活動</a>
+                </div>
+            </div>
+            <a href="<?php echo url('create-event'); ?>" class="btn btn-primary">
+                <i class="fas fa-plus"></i> 建立新活動
+            </a>
+        </div>
     </div>
     
     <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">

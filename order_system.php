@@ -158,9 +158,6 @@ include_once 'includes/header.php';
                             <button class="btn btn-sm btn-light" data-toggle="modal" data-target="#shareCodeModal">
                                 <i class="fas fa-share-alt"></i> 分享碼
                             </button>
-                            <a href="<?php echo url('edit-event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
-                                <i class="fas fa-edit"></i> 編輯
-                            </a>
                         <?php endif; ?>
                         <a href="<?php echo url('event', ['id' => $event_id]); ?>" class="btn btn-sm btn-light">
                             <i class="fas fa-info-circle"></i> 活動詳情
@@ -512,6 +509,29 @@ include_once 'includes/header.php';
                     </a>
                 </div>
             </div>
+
+            <!-- 菜單圖片 - 新增區塊 -->
+            <div class="card shadow mt-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="m-0"><i class="fas fa-image"></i> 菜單圖片</h5>
+                    <button id="loadMenuImages" class="btn btn-sm btn-light">
+                        <i class="fas fa-sync-alt"></i> 載入圖片
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="menuImagesContainer" class="text-center">
+                        <div class="spinner-border text-primary d-none" role="status" id="menuImagesLoading">
+                            <span class="sr-only">載入中...</span>
+                        </div>
+                        <div id="menuImagesContent" class="row">
+                            <!-- 菜單圖片將通過 AJAX 載入到這裡 -->
+                        </div>
+                        <div id="noMenuImages" class="alert alert-info mt-3 d-none">
+                            <i class="fas fa-info-circle"></i> 此餐廳尚未上傳菜單圖片
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -549,6 +569,23 @@ include_once 'includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<!-- 添加圖片預覽模態框 -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imagePreviewModalTitle">菜單圖片預覽</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="previewImage" src="" class="img-fluid" alt="菜單預覽" style="max-width: 100%; max-height: 70vh;">
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -744,7 +781,175 @@ document.addEventListener('DOMContentLoaded', function() {
             groupButton.innerHTML = '<i class="fas fa-users"></i> 依用戶分組';
         });
     });
+    
+    // 菜單圖片載入功能
+    function loadMenuImages(restaurant_id) {
+        // 顯示載入中
+        const loadingEl = document.getElementById('menuImagesLoading');
+        const contentEl = document.getElementById('menuImagesContent');
+        const noImagesEl = document.getElementById('noMenuImages');
+        
+        loadingEl.classList.remove('d-none');
+        contentEl.innerHTML = '';
+        noImagesEl.classList.add('d-none');
+        
+        // 執行 AJAX 請求
+        fetch(`<?php echo url('api-get-restaurant-images'); ?>?restaurant_id=${restaurant_id}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                loadingEl.classList.add('d-none');
+                
+                if (data.success && data.images.length > 0) {
+                    // 顯示圖片
+                    data.images.forEach(image => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6 col-lg-4 mb-3';
+                        
+                        const card = document.createElement('div');
+                        card.className = 'card h-100';
+                        
+                        const imgContainer = document.createElement('div');
+                        imgContainer.className = 'image-preview-container';
+                        imgContainer.style.cursor = 'pointer';
+                        
+                        const img = document.createElement('img');
+                        img.src = `/${image.image_path}`;
+                        img.className = 'card-img-top';
+                        img.alt = '菜單圖片';
+                        img.style.height = '200px';
+                        img.style.objectFit = 'cover';
+                        
+                        // 添加圖片點擊事件
+                        imgContainer.onclick = function() {
+                            previewImage(`/${image.image_path}`, image.description || '菜單圖片');
+                        };
+                        
+                        // 添加覆蓋層效果
+                        const overlay = document.createElement('div');
+                        overlay.className = 'image-overlay';
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-search-plus';
+                        overlay.appendChild(icon);
+                        
+                        imgContainer.appendChild(img);
+                        imgContainer.appendChild(overlay);
+                        card.appendChild(imgContainer);
+                        
+                        const cardBody = document.createElement('div');
+                        cardBody.className = 'card-body p-2 text-center';
+                        
+                        const uploadDate = document.createElement('small');
+                        uploadDate.className = 'text-muted';
+                        uploadDate.textContent = `上傳於: ${formatDate(image.created_at)}`;
+                        
+                        cardBody.appendChild(uploadDate);
+                        card.appendChild(cardBody);
+                        
+                        col.appendChild(card);
+                        contentEl.appendChild(col);
+                    });
+                } else {
+                    // 顯示無圖片信息
+                    noImagesEl.classList.remove('d-none');
+                }
+            })
+            .catch(error => {
+                console.error('載入菜單圖片出錯:', error);
+                loadingEl.classList.add('d-none');
+                
+                // 顯示錯誤信息
+                contentEl.innerHTML = `
+                    <div class="alert alert-danger w-100">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        載入菜單圖片時發生錯誤。請稍後再試。
+                    </div>
+                `;
+            });
+    }
+    
+    // 格式化日期
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('zh-TW', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+    
+    // 綁定載入按鈕事件
+    document.getElementById('loadMenuImages')?.addEventListener('click', function() {
+        loadMenuImages(<?php echo $event['restaurant_id']; ?>);
+    });
+    
+    // 頁面載入時自動載入菜單圖片
+    if (document.getElementById('menuImagesContainer')) {
+        loadMenuImages(<?php echo $event['restaurant_id']; ?>);
+    }
+    
+    // 使用事件委託為動態添加的圖片添加點擊預覽功能
+    document.addEventListener('click', function(event) {
+        if (event.target.closest('.image-preview-container')) {
+            const container = event.target.closest('.image-preview-container');
+            const img = container.querySelector('img');
+            if (img) {
+                previewImage(img.src, img.alt || '菜單圖片');
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        }
+    });
 });
+
+// 圖片預覽函數
+function previewImage(src, title) {
+    document.getElementById('imagePreviewModalTitle').textContent = title || '菜單圖片預覽';
+    document.getElementById('previewImage').src = src;
+    $('#imagePreviewModal').modal('show');
+}
 </script>
+
+<style>
+/* 圖片預覽相關樣式 */
+.image-preview-container {
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.image-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.image-overlay i {
+    color: white;
+    font-size: 2rem;
+}
+
+.image-preview-container:hover .image-overlay {
+    opacity: 1;
+}
+</style>
+
+<!-- 載入 Lightbox CSS 和 JS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
 
 <?php include_once 'includes/footer.php'; ?>

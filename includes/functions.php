@@ -164,30 +164,33 @@ function getFlashMessage() {
 }
 
 /**
- * 簡化 URL 生成並支援查詢參數
- * 
+ * 產生站內 URL
  * @param string $route 路由名稱
- * @param array $params 參數陣列
+ * @param array $params 要加入 URL 的參數
  * @return string 完整 URL
  */
 function url($route = '', $params = []) {
-    $baseUrl = isset($GLOBALS['baseUrl']) ? $GLOBALS['baseUrl'] : '';
+    // 確保 BASE_URL 是正確定義的
+    $base = defined('BASE_URL') ? BASE_URL : '/';
     
-    // 調整 route 為空時的處理
-    $url = $baseUrl . ($route ? $route : '');
-    
-    // 處理非關聯陣列的查詢參數（例如 ['id' => 1]）
-    if (!empty($params)) {
-        $queryParts = [];
-        foreach ($params as $key => $value) {
-            if (is_string($key)) {
-                $queryParts[] = urlencode($key) . '=' . urlencode($value);
-            }
-        }
+    // 避免路徑中有重複的斜線
+    if (!empty($route)) {
+        // 移除開頭的斜線以避免重複
+        $route = ltrim($route, '/');
         
-        if (!empty($queryParts)) {
-            $url .= '?' . implode('&', $queryParts);
+        // 確保 BASE_URL 末尾有斜線
+        if (substr($base, -1) != '/') {
+            $base .= '/';
         }
+    }
+    
+    // 構建基礎 URL
+    $url = $base . $route;
+    
+    // 添加查詢參數
+    if (!empty($params)) {
+        $query = http_build_query($params);
+        $url .= (strpos($url, '?') === false ? '?' : '&') . $query;
     }
     
     return $url;

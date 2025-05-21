@@ -72,6 +72,11 @@ $routes = [
         'auth' => true,
         'title' => '刪除餐廳'
     ],
+    'delete-restaurant-image' => [
+        'file' => 'restaurants/delete_image.php',
+        'auth' => true,
+        'title' => '刪除餐廳圖片'
+    ],
     'events' => [
         'file' => 'events.php',
         'auth' => true,
@@ -101,6 +106,11 @@ $routes = [
         'file' => 'join_by_code.php',
         'auth' => true,
         'title' => '透過分享碼加入活動'
+    ],
+    'upload-restaurant-images' => [
+        'file' => 'restaurants/upload_images.php',
+        'auth' => true,
+        'title' => '上傳餐廳圖片'
     ],
     
     // 資料庫更新路由
@@ -149,6 +159,19 @@ $routes = [
         'file' => 'close_event.php',
         'auth' => true,
         'title' => '關閉活動'
+    ],
+    // 新增 API 路由
+    'api-get-restaurant-images' => [
+        'file' => 'api/get_restaurant_images.php',
+        'auth' => true
+    ],
+    'api-delete-restaurant-image' => [
+        'file' => 'api/delete_restaurant_image.php',
+        'auth' => true
+    ],
+    'api-update-restaurant' => [
+        'file' => 'api/update_restaurant.php',
+        'auth' => true
     ]
 ];
 

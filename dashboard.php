@@ -31,27 +31,31 @@ $recentEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created
                       JOIN restaurants r ON e.restaurant_id = r.id 
                       WHERE e.creator_id = ? 
                       ORDER BY e.created_at DESC 
-                      LIMIT 5";
+                      LIMIT 3"; // 只顯示最近的3個
 $recentEventsStmt = $conn->prepare($recentEventsQuery);
 $recentEventsStmt->bind_param("i", $_SESSION['user_id']);
 $recentEventsStmt->execute();
 $recentEvents = $recentEventsStmt->get_result();
 
 // 獲取使用者參與的活動
-$joinedEventsQuery = "SELECT e.id, e.title, r.name AS restaurant_name, e.created_at, e.is_closed,
-                      u.name AS creator_name, e.share_code, e.deadline,
-                      (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS participant_count
-                      FROM events e
-                      JOIN event_participants ep ON e.id = ep.event_id
-                      JOIN restaurants r ON e.restaurant_id = r.id
-                      JOIN users u ON e.creator_id = u.id
-                      WHERE ep.user_id = ? AND e.creator_id != ?
-                      ORDER BY ep.joined_at DESC
-                      LIMIT 3";
-$joinedEventsStmt = $conn->prepare($joinedEventsQuery);
-$joinedEventsStmt->bind_param("ii", $_SESSION['user_id'], $_SESSION['user_id']);
-$joinedEventsStmt->execute();
-$joinedEvents = $joinedEventsStmt->get_result();
+$sql = "SELECT e.*, r.name AS restaurant_name, u.name AS creator_name, 
+        COUNT(ep2.id) AS participant_count, 
+        (e.creator_id = ?) AS is_creator
+        FROM event_participants ep
+        JOIN events e ON ep.event_id = e.id
+        JOIN restaurants r ON e.restaurant_id = r.id
+        JOIN users u ON e.creator_id = u.id
+        LEFT JOIN event_participants ep2 ON ep.event_id = ep2.event_id
+        WHERE ep.user_id = ? AND e.is_closed = 0  /* 添加條件：只顯示未關閉的活動 */
+        GROUP BY e.id
+        ORDER BY e.created_at DESC
+        LIMIT 3"; // 只顯示最近的3個
+
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("ii", $_SESSION['user_id'], $_SESSION['user_id']);
+$stmt->execute();
+$joinedEvents = $stmt->get_result();
+$stmt->close();
 
 include 'includes/header.php';
 ?>
