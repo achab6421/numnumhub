@@ -1,14 +1,61 @@
 <?php
 // 透過分享碼加入活動
-require_once 'includes/init.php';
 
 // 確保用戶已登入
+
+require_once 'includes/init.php';
 if (!isLoggedIn()) {
-    redirect('login');
+    // 保留當前 URL 和查詢參數
+    $current_url = $_SERVER['REQUEST_URI'];
+    $login_url = 'https://achab6421phpaccount.free.nf/numnumhub/login?redirect=' . urlencode($current_url);
+    header("Location: " . $login_url);
+    exit;
 }
 
 $error = '';
 $success = '';
+
+// 檢查URL中是否有分享碼參數，如果有則先檢查用戶是否已經加入
+if (isset($_GET['code'])) {
+    $share_code = strtoupper(trim($_GET['code']));
+    $user_id = $_SESSION['user_id'];
+    
+    if (!empty($share_code)) {
+        global $conn;
+        
+        // 查找該分享碼對應的活動
+        $stmt = $conn->prepare("SELECT id, title, creator_id, is_closed FROM events WHERE share_code = ?");
+        $stmt->bind_param("s", $share_code);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows > 0) {
+            $event = $result->fetch_assoc();
+            $event_id = $event['id'];
+            
+            // 如果是活動創建者，直接跳轉到點餐頁面
+            if ($event['creator_id'] == $user_id) {
+                header("Location: https://achab6421phpaccount.free.nf/numnumhub/order-system?id=" . $event_id);
+                exit;
+            }
+            
+            // 檢查是否已加入此活動
+            $check_sql = "SELECT id FROM event_participants WHERE event_id = ? AND user_id = ?";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("ii", $event_id, $user_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                // 如果已經加入此活動，直接重定向到點餐頁面
+                header("Location: https://achab6421phpaccount.free.nf/numnumhub/order-system?id=" . $event_id);
+                exit;
+            }
+            $check_stmt->close();
+        }
+        $stmt->close();
+    }
+}
 
 // 處理表單提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -38,7 +85,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } 
             // 檢查是否為活動創建者（創建者已自動加入）
             elseif ($event['creator_id'] == $user_id) {
-                $error = "您是此活動的創建者，無需加入";
+                // 如果是活動創建者，直接跳轉到點餐頁面
+                header("Location: https://achab6421phpaccount.free.nf/numnumhub/order-system?id=" . $event_id);
+                exit;
             } else {
                 // 檢查是否已加入此活動
                 $check_sql = "SELECT id FROM event_participants WHERE event_id = ? AND user_id = ?";
@@ -48,7 +97,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $check_result = $check_stmt->get_result();
                 
                 if ($check_result->num_rows > 0) {
-                    $error = "您已經加入此活動";
+                    // 如果已經加入此活動，直接重定向到點餐頁面
+                    header("Location: https://achab6421phpaccount.free.nf/numnumhub/order-system?id=" . $event_id);
+                    exit;
                 } else {
                     // 加入活動
                     $join_sql = "INSERT INTO event_participants (event_id, user_id, joined_at) VALUES (?, ?, NOW())";
@@ -58,7 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($join_stmt->execute()) {
                         $success = "您已成功加入「{$event['title']}」活動！";
                         // 重定向到活動詳情頁
-                        redirect('event', ['id' => $event_id]);
+                        header("Location: https://achab6421phpaccount.free.nf/numnumhub/order-system?id=" . $event_id);
+                        exit;
                     } else {
                         $error = "加入活動時發生錯誤";
                     }
@@ -92,7 +144,7 @@ include_once 'includes/header.php';
                         <div class="alert alert-success"><?php echo $success; ?></div>
                     <?php endif; ?>
                     
-                    <form method="post" action="<?php echo url('join-by-code'); ?>">
+                    <form method="post" action="https://achab6421phpaccount.free.nf/numnumhub/join-by-code">
                         <div class="form-group">
                             <label for="share_code">活動分享碼</label>
                             <input type="text" class="form-control form-control-lg text-center" id="share_code" name="share_code" 
@@ -110,13 +162,13 @@ include_once 'includes/header.php';
     </div>
 </div>
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function () {
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code'); // 抓取 ?code= 後的值
   if (code) {
     document.getElementById('share_code').value = code;
   }
 });
-                    </script>
+</script>
 
 <?php include_once 'includes/footer.php'; ?>

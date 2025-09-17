@@ -87,6 +87,11 @@ $routes = [
         'auth' => true,
         'title' => '活動詳情'
     ],
+    'leave-event' => [
+        'file' => 'leave_event.php',
+        'auth' => true,
+        'title' => '退出活動'  // 修改標題更為準確
+    ],
     'create-event' => [
         'file' => 'create_event.php',
         'auth' => true,
@@ -169,8 +174,8 @@ $routes = [
         'file' => 'api/delete_restaurant_image.php',
         'auth' => true
     ],
-    'api-update-restaurant' => [
-        'file' => 'api/update_restaurant.php',
+    'update-payment-status' => [
+        'file' => 'update_payment_status.php',
         'auth' => true
     ]
 ];

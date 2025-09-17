@@ -400,6 +400,28 @@ include_once 'includes/header.php';
                 <div class="card-body p-0">
                     <ul class="list-group list-group-flush">
                         <?php if (count($participants) > 0): ?>
+                            <?php 
+                            // 計算每個用戶的消費總額
+                            $user_spending = [];
+                            foreach ($user_totals as $id => $user_data) {
+                                $user_spending[$id] = $user_data['total'];
+                            }
+                            
+                            // 獲取付款狀態
+                            $payment_status = [];
+                            if ($event['is_creator']) {
+                                $payment_sql = "SELECT user_id, is_paid FROM event_participants WHERE event_id = ?";
+                                $payment_stmt = $conn->prepare($payment_sql);
+                                $payment_stmt->bind_param("i", $event_id);
+                                $payment_stmt->execute();
+                                $payment_result = $payment_stmt->get_result();
+                                while ($payment = $payment_result->fetch_assoc()) {
+                                    $payment_status[$payment['user_id']] = $payment['is_paid'];
+                                }
+                                $payment_stmt->close();
+                            }
+                            ?>
+                            
                             <?php foreach ($participants as $participant): ?>
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
@@ -411,9 +433,38 @@ include_once 'includes/header.php';
                                             <span class="badge badge-success">你</span>
                                         <?php endif; ?>
                                     </div>
-                                    <small class="text-muted">
-                                        <?php echo date('m/d H:i', strtotime($participant['joined_at'])); ?>
-                                    </small>
+                                    <div class="d-flex align-items-center">
+                                        <?php if (isset($user_spending[$participant['id']])): ?>
+                                            <span class="badge badge-warning mr-2">
+                                                $<?php echo number_format($user_spending[$participant['id']]); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="badge badge-light mr-2">$0</span>
+                                        <?php endif; ?>
+                                        
+                                        <?php if ($event['is_creator'] && $participant['id'] != $event['creator_id']): ?>
+                                            <?php $isPaid = isset($payment_status[$participant['id']]) && $payment_status[$participant['id']] == 1; ?>
+                                            <div class="custom-control custom-switch mr-2">
+                                                <input type="checkbox" class="custom-control-input payment-toggle" 
+                                                    id="paymentStatus<?php echo $participant['id']; ?>" 
+                                                    data-user-id="<?php echo $participant['id']; ?>" 
+                                                    data-event-id="<?php echo $event_id; ?>"
+                                                    <?php echo $isPaid ? 'checked' : ''; ?>>
+                                                <label class="custom-control-label" for="paymentStatus<?php echo $participant['id']; ?>"
+                                                    data-toggle="tooltip" title="<?php echo $isPaid ? '已付款' : '未付款'; ?>">
+                                                    <?php echo $isPaid ? '✓' : ''; ?>
+                                                </label>
+                                            </div>
+                                        <?php elseif (isset($payment_status[$participant['id']]) && $payment_status[$participant['id']] == 1): ?>
+                                            <span class="badge badge-success mr-2" data-toggle="tooltip" title="已付款">
+                                                <i class="fas fa-check"></i>
+                                            </span>
+                                        <?php endif; ?>
+                                        
+                                        <small class="text-muted">
+                                            <?php echo date('m/d H:i', strtotime($participant['joined_at'])); ?>
+                                        </small>
+                                    </div>
                                 </li>
                             <?php endforeach; ?>
                         <?php else: ?>
@@ -423,11 +474,11 @@ include_once 'includes/header.php';
                 </div>
             </div>
             
-            <!-- 消費統計 -->
+            <!-- 餐點統計 -->
             <?php if (count($user_totals) > 0): ?>
             <div class="card shadow mb-4">
                 <div class="card-header bg-warning text-dark">
-                    <h5 class="m-0">消費統計</h5>
+                    <h5 class="m-0">餐點統計</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
@@ -440,18 +491,15 @@ include_once 'includes/header.php';
                                             <span class="badge badge-success">你</span>
                                         <?php endif; ?>
                                     </strong>
-                                    <span class="badge badge-warning badge-pill">
-                                        $<?php echo number_format($user_data['total']); ?>
-                                    </span>
                                 </div>
                                 <div class="mt-2 small">
                                     <ul class="list-unstyled mb-0">
                                         <?php foreach ($user_data['items'] as $item): ?>
-                                            <li>
+                                            <li class="pb-1">
                                                 <?php echo htmlspecialchars($item['menu_item']); ?> 
-                                                x <?php echo $item['quantity']; ?> 
-                                                <?php if ($item['price'] > 0): ?>
-                                                    ($<?php echo number_format($item['price']); ?>)
+                                                x <?php echo $item['quantity']; ?>
+                                                <?php if (!empty($item['note'])): ?>
+                                                    <span class="text-muted"> - <?php echo htmlspecialchars($item['note']); ?></span>
                                                 <?php endif; ?>
                                             </li>
                                         <?php endforeach; ?>
@@ -496,7 +544,7 @@ include_once 'includes/header.php';
                     <?php endif; ?>
                     
                     <?php if (!$event['is_creator'] && !$event['is_closed']): ?>
-                        <form action="<?php echo url('leave'); ?>" method="post" class="mb-2" onsubmit="return confirm('確定要退出此活動嗎？這將刪除您的所有點餐記錄');">
+                        <form action="<?php echo url('leave-event'); ?>" method="post" class="mb-2" onsubmit="return confirm('確定要退出此活動嗎？');">
                             <input type="hidden" name="event_id" value="<?php echo $event_id; ?>">
                             <button type="submit" class="btn btn-outline-danger btn-block">
                                 <i class="fas fa-sign-out-alt"></i> 退出活動
@@ -511,7 +559,7 @@ include_once 'includes/header.php';
             </div>
 
             <!-- 菜單圖片 - 新增區塊 -->
-            <div class="card shadow mt-4">
+            <div class="card shadow mt-4" id="menuImagesCard">
                 <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                     <h5 class="m-0"><i class="fas fa-image"></i> 菜單圖片</h5>
                     <button id="loadMenuImages" class="btn btn-sm btn-light">
@@ -529,6 +577,42 @@ include_once 'includes/header.php';
                         <div id="noMenuImages" class="alert alert-info mt-3 d-none">
                             <i class="fas fa-info-circle"></i> 此餐廳尚未上傳菜單圖片
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 手機端浮動菜單按鈕 -->
+<div id="floatingMenuBtn" class="floating-menu-btn d-md-none">
+    <button class="btn btn-primary btn-lg rounded-circle shadow-lg" data-toggle="tooltip" title="查看菜單圖片">
+        <i class="fas fa-utensils"></i>
+    </button>
+</div>
+
+<!-- 手機端菜單圖片彈出視窗 -->
+<div class="modal fade" id="mobileMenuModal" tabindex="-1" aria-labelledby="mobileMenuModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mobileMenuModalLabel">
+                    <i class="fas fa-image"></i> 菜單圖片
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-2">
+                <div id="mobileMenuImagesContainer" class="text-center">
+                    <div class="spinner-border text-primary d-none" role="status" id="mobileMenuImagesLoading">
+                        <span class="sr-only">載入中...</span>
+                    </div>
+                    <div id="mobileMenuImagesContent" class="row">
+                        <!-- 手機端菜單圖片將載入到這裡 -->
+                    </div>
+                    <div id="mobileNoMenuImages" class="alert alert-info mt-3 d-none">
+                        <i class="fas fa-info-circle"></i> 此餐廳尚未上傳菜單圖片
                     </div>
                 </div>
             </div>
@@ -554,13 +638,13 @@ include_once 'includes/header.php';
                 </h2>
                 <p class="mt-3">或分享以下連結：</p>
                 <div class="input-group mb-3">
-                    <input type="text" class="form-control" id="shareLink" value="<?php echo htmlspecialchars(getBaseUrl() . url('join-by-code') . '?code=' . urlencode($event['share_code'])); ?>" readonly>
-                    <div class="input-group-append">
-                        <button class="btn btn-outline-primary" type="button" id="copyLink" title="複製連結">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </div>
+                <input type="text" class="form-control" id="shareLink" value="https://achab6421phpaccount.free.nf<?php echo url('join-by-code') . '?code=' . urlencode($event['share_code']); ?>" readonly>
+                <div class="input-group-append">
+                    <button class="btn btn-outline-primary" type="button" id="copyLink" title="複製連結">
+                        <i class="fas fa-copy"></i>
+                    </button>
                 </div>
+            </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">關閉</button>
@@ -572,16 +656,33 @@ include_once 'includes/header.php';
 
 <!-- 添加圖片預覽模態框 -->
 <div class="modal fade" id="imagePreviewModal" tabindex="-1" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl" id="imagePreviewModalDialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="imagePreviewModalTitle">菜單圖片預覽</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <div class="d-flex align-items-center">
+                    <button type="button" class="btn btn-sm btn-outline-secondary mr-2" id="zoomToggleBtn" title="放大/縮小">
+                        <i class="fas fa-expand" id="zoomIcon"></i>
+                    </button>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
             </div>
-            <div class="modal-body text-center">
-                <img id="previewImage" src="" class="img-fluid" alt="菜單預覽" style="max-width: 100%; max-height: 70vh;">
+            <div class="modal-body text-center" id="imagePreviewBody">
+                <!-- 操作提示 -->
+                <div class="alert alert-info p-2 mb-3" id="imageControlsHint">
+                    <small>
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>操作提示：</strong>
+                        滾輪縮放 | 拖拽移動 | 單擊放大 | 雙擊重置 | 
+                        <i class="fas fa-expand"></i> 按鈕快速切換
+                    </small>
+                </div>
+                
+                <div class="image-container" id="imageContainer">
+                    <img id="previewImage" src="" class="img-fluid" alt="菜單預覽" style="max-width: 100%; max-height: 70vh; cursor: zoom-in; transition: transform 0.3s ease;">
+                </div>
             </div>
         </div>
     </div>
@@ -894,6 +995,113 @@ document.addEventListener('DOMContentLoaded', function() {
         loadMenuImages(<?php echo $event['restaurant_id']; ?>);
     }
     
+    // 手機端浮動菜單按鈕功能
+    const floatingMenuBtn = document.getElementById('floatingMenuBtn');
+    
+    // 點擊浮動按鈕顯示手機端菜單模態框
+    if (floatingMenuBtn) {
+        floatingMenuBtn.querySelector('button').addEventListener('click', function() {
+            // 載入菜單圖片到手機端模態框
+            loadMobileMenuImages(<?php echo $event['restaurant_id']; ?>);
+            $('#mobileMenuModal').modal('show');
+        });
+    }
+    
+    // 載入手機端菜單圖片功能
+    function loadMobileMenuImages(restaurant_id) {
+        // 顯示載入中
+        const loadingEl = document.getElementById('mobileMenuImagesLoading');
+        const contentEl = document.getElementById('mobileMenuImagesContent');
+        const noImagesEl = document.getElementById('mobileNoMenuImages');
+        
+        loadingEl.classList.remove('d-none');
+        contentEl.innerHTML = '';
+        noImagesEl.classList.add('d-none');
+        
+        // 執行 AJAX 請求
+        fetch(`/api-get-restaurant-images?restaurant_id=${restaurant_id}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                loadingEl.classList.add('d-none');
+                
+                if (data.success && data.images.length > 0) {
+                    // 顯示圖片 - 手機端單列顯示
+                    data.images.forEach(image => {
+                        const col = document.createElement('div');
+                        col.className = 'col-12 mb-3';
+                        
+                        const card = document.createElement('div');
+                        card.className = 'card h-100';
+                        
+                        const imgContainer = document.createElement('div');
+                        imgContainer.className = 'image-preview-container';
+                        imgContainer.style.cursor = 'pointer';
+                        
+                        const img = document.createElement('img');
+                        img.src = `/${image.image_path}`;
+                        img.className = 'card-img-top';
+                        img.alt = '菜單圖片';
+                        img.style.height = '300px';
+                        img.style.objectFit = 'cover';
+                        
+                        // 添加圖片點擊事件
+                        imgContainer.onclick = function() {
+                            // 關閉手機端模態框並開啟圖片預覽
+                            $('#mobileMenuModal').modal('hide');
+                            setTimeout(() => {
+                                previewImage(`/${image.image_path}`, image.description || '菜單圖片');
+                            }, 300);
+                        };
+                        
+                        // 添加覆蓋層效果
+                        const overlay = document.createElement('div');
+                        overlay.className = 'image-overlay';
+                        const icon = document.createElement('i');
+                        icon.className = 'fas fa-search-plus';
+                        overlay.appendChild(icon);
+                        
+                        imgContainer.appendChild(img);
+                        imgContainer.appendChild(overlay);
+                        card.appendChild(imgContainer);
+                        
+                        const cardBody = document.createElement('div');
+                        cardBody.className = 'card-body p-2 text-center';
+                        
+                        const uploadDate = document.createElement('small');
+                        uploadDate.className = 'text-muted';
+                        uploadDate.textContent = `上傳於: ${formatDate(image.created_at)}`;
+                        
+                        cardBody.appendChild(uploadDate);
+                        card.appendChild(cardBody);
+                        
+                        col.appendChild(card);
+                        contentEl.appendChild(col);
+                    });
+                } else {
+                    // 顯示無圖片信息
+                    noImagesEl.classList.remove('d-none');
+                }
+            })
+            .catch(error => {
+                console.error('載入手機端菜單圖片出錯:', error);
+                loadingEl.classList.add('d-none');
+                
+                // 顯示錯誤信息
+                contentEl.innerHTML = `
+                    <div class="alert alert-danger w-100">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        載入菜單圖片時發生錯誤。請稍後再試。
+                    </div>
+                `;
+            });
+    }
+    
+    
     // 使用事件委託為動態添加的圖片添加點擊預覽功能
     document.addEventListener('click', function(event) {
         if (event.target.closest('.image-preview-container')) {
@@ -906,13 +1114,434 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+    
+    // 初始化圖片縮放功能
+    initImageZoom();
+    
+    // 處理付款狀態切換
+    document.querySelectorAll('.payment-toggle').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            const userId = this.getAttribute('data-user-id');
+            const eventId = this.getAttribute('data-event-id');
+            const isPaid = this.checked ? 1 : 0;
+            
+            // 顯示處理中狀態
+            const label = this.nextElementSibling;
+            const originalTitle = label.getAttribute('data-original-title');
+            $(label).tooltip('hide')
+                .attr('data-original-title', '更新中...')
+                .tooltip('show');
+            
+            // 發送AJAX請求更新付款狀態
+            fetch('<?php echo url('update-payment-status'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `user_id=${userId}&event_id=${eventId}&is_paid=${isPaid}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    label.textContent = isPaid ? '✓' : '';
+                    $(label).tooltip('hide')
+                        .attr('data-original-title', isPaid ? '已付款' : '未付款')
+                        .tooltip('show');
+                        
+                    // 顯示成功消息
+                    const successMessage = document.createElement('div');
+                    successMessage.className = 'alert alert-success alert-dismissible fade show';
+                    successMessage.innerHTML = `
+                        <strong>成功!</strong> ${data.message}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    `;
+                    document.querySelector('.container').insertBefore(successMessage, document.querySelector('.container').firstChild);
+                    
+                    // 自動關閉消息
+                    setTimeout(() => {
+                        $(successMessage).alert('close');
+                    }, 3000);
+                } else {
+                    // 回滾UI狀態
+                    checkbox.checked = !checkbox.checked;
+                    
+                    // 顯示錯誤消息
+                    alert('更新付款狀態失敗: ' + data.message);
+                    $(label).tooltip('hide')
+                        .attr('data-original-title', originalTitle)
+                        .tooltip('show');
+                }
+            })
+            .catch(error => {
+                console.error('更新付款狀態時發生錯誤:', error);
+                
+                // 回滾UI狀態
+                checkbox.checked = !checkbox.checked;
+                alert('更新付款狀態時發生錯誤，請稍後再試。');
+                
+                $(label).tooltip('hide')
+                    .attr('data-original-title', originalTitle)
+                    .tooltip('show');
+            });
+        });
+    });
 });
 
 // 圖片預覽函數
 function previewImage(src, title) {
     document.getElementById('imagePreviewModalTitle').textContent = title || '菜單圖片預覽';
-    document.getElementById('previewImage').src = src;
+    const previewImg = document.getElementById('previewImage');
+    previewImg.src = src;
+    previewImg.style.transform = 'scale(1)';
+    previewImg.style.cursor = 'zoom-in';
+    
+    // 重置放大按鈕
+    const zoomBtn = document.getElementById('zoomToggleBtn');
+    const zoomIcon = document.getElementById('zoomIcon');
+    zoomBtn.setAttribute('data-zoomed', 'false');
+    zoomIcon.className = 'fas fa-expand';
+    
     $('#imagePreviewModal').modal('show');
+}
+
+// 圖片縮放功能
+function initImageZoom() {
+    const previewImg = document.getElementById('previewImage');
+    const zoomBtn = document.getElementById('zoomToggleBtn');
+    const zoomIcon = document.getElementById('zoomIcon');
+    const modalDialog = document.getElementById('imagePreviewModalDialog');
+    const imageContainer = document.getElementById('imageContainer');
+    
+    // 縮放變數
+    let currentScale = 1;
+    let minScale = 0.5;
+    let maxScale = 5;
+    let isDragging = false;
+    let lastX = 0;
+    let lastY = 0;
+    let translateX = 0;
+    let translateY = 0;
+    
+    // 觸控變數
+    let isTouch = false;
+    let initialDistance = 0;
+    let initialScale = 1;
+    let touches = [];
+    
+    // 重置縮放狀態
+    function resetZoom() {
+        currentScale = 1;
+        translateX = 0;
+        translateY = 0;
+        previewImg.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+        previewImg.style.cursor = 'zoom-in';
+        imageContainer.style.overflow = 'visible';
+        imageContainer.style.height = 'auto';
+        modalDialog.className = 'modal-dialog modal-xl';
+        
+        zoomBtn.setAttribute('data-zoomed', 'false');
+        zoomIcon.className = 'fas fa-expand';
+        zoomBtn.title = '放大';
+        
+        // 重置操作提示
+        const controlsHint = document.getElementById('imageControlsHint');
+        controlsHint.innerHTML = `
+            <small>
+                <i class="fas fa-info-circle"></i> 
+                <strong>操作提示：</strong>
+                滾輪縮放 | 拖拽移動 | 單擊放大 | 雙擊重置 | 
+                <i class="fas fa-expand"></i> 按鈕快速切換
+            </small>
+        `;
+        controlsHint.className = 'alert alert-info p-2 mb-3';
+    }
+    
+    // 更新圖片變換
+    function updateTransform() {
+        previewImg.style.transform = `scale(${currentScale}) translate(${translateX}px, ${translateY}px)`;
+        
+        // 控制操作提示的顯示
+        const controlsHint = document.getElementById('imageControlsHint');
+        if (currentScale > 1) {
+            // 放大模式時讓提示更簡潔
+            controlsHint.innerHTML = `
+                <small>
+                    <i class="fas fa-hand-rock"></i> 
+                    <strong>已放大：</strong>
+                    拖拽移動 | 滾輪縮放 | 雙擊重置 | <i class="fas fa-compress"></i> 縮小
+                </small>
+            `;
+            controlsHint.className = 'alert alert-success p-2 mb-3';
+        } else {
+            // 正常模式時顯示完整提示
+            controlsHint.innerHTML = `
+                <small>
+                    <i class="fas fa-info-circle"></i> 
+                    <strong>操作提示：</strong>
+                    滾輪縮放 | 拖拽移動 | 單擊放大 | 雙擊重置 | 
+                    <i class="fas fa-expand"></i> 按鈕快速切換
+                </small>
+            `;
+            controlsHint.className = 'alert alert-info p-2 mb-3';
+        }
+        
+        // 更新游標樣式
+        if (currentScale > 1) {
+            previewImg.style.cursor = 'grab';
+            imageContainer.style.overflow = 'hidden';
+            if (modalDialog.className !== 'modal-dialog modal-fullscreen') {
+                modalDialog.className = 'modal-dialog modal-fullscreen';
+                imageContainer.style.height = '80vh';
+            }
+        } else {
+            previewImg.style.cursor = 'zoom-in';
+            imageContainer.style.overflow = 'visible';
+            if (modalDialog.className !== 'modal-dialog modal-xl') {
+                modalDialog.className = 'modal-dialog modal-xl';
+                imageContainer.style.height = 'auto';
+            }
+        }
+        
+        // 更新按鈕狀態
+        if (currentScale > 1) {
+            zoomBtn.setAttribute('data-zoomed', 'true');
+            zoomIcon.className = 'fas fa-compress';
+            zoomBtn.title = '縮小';
+        } else {
+            zoomBtn.setAttribute('data-zoomed', 'false');
+            zoomIcon.className = 'fas fa-expand';
+            zoomBtn.title = '放大';
+        }
+    }
+    
+    // 計算兩點間距離
+    function getDistance(touch1, touch2) {
+        return Math.sqrt(
+            Math.pow(touch2.clientX - touch1.clientX, 2) +
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+    }
+    
+    // 滾輪縮放事件
+    function handleWheel(e) {
+        e.preventDefault();
+        
+        const rect = previewImg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // 計算滑鼠相對於圖片的位置
+        const mouseX = (x - rect.width / 2) / currentScale;
+        const mouseY = (y - rect.height / 2) / currentScale;
+        
+        // 計算縮放比例
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newScale = Math.max(minScale, Math.min(maxScale, currentScale * delta));
+        
+        if (newScale !== currentScale) {
+            // 計算新的平移量，使縮放以滑鼠位置為中心
+            const scaleDiff = newScale - currentScale;
+            translateX -= mouseX * scaleDiff;
+            translateY -= mouseY * scaleDiff;
+            
+            currentScale = newScale;
+            updateTransform();
+        }
+    }
+    
+    // 觸控開始事件
+    function handleTouchStart(e) {
+        e.preventDefault();
+        isTouch = true;
+        touches = Array.from(e.touches);
+        
+        if (touches.length === 1) {
+            // 單指拖拽
+            isDragging = true;
+            lastX = touches[0].clientX;
+            lastY = touches[0].clientY;
+        } else if (touches.length === 2) {
+            // 雙指縮放
+            isDragging = false;
+            initialDistance = getDistance(touches[0], touches[1]);
+            initialScale = currentScale;
+        }
+    }
+    
+    // 觸控移動事件
+    function handleTouchMove(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isTouch) return;
+        
+        touches = Array.from(e.touches);
+        
+        if (touches.length === 1 && isDragging) {
+            // 單指拖拽 - 移除縮放檢查，允許在任何縮放級別下拖拽
+            const deltaX = touches[0].clientX - lastX;
+            const deltaY = touches[0].clientY - lastY;
+            
+            translateX += deltaX / currentScale;
+            translateY += deltaY / currentScale;
+            
+            lastX = touches[0].clientX;
+            lastY = touches[0].clientY;
+            
+            updateTransform();
+        } else if (touches.length === 2) {
+            // 雙指縮放
+            const currentDistance = getDistance(touches[0], touches[1]);
+            const scale = (currentDistance / initialDistance) * initialScale;
+            const newScale = Math.max(minScale, Math.min(maxScale, scale));
+            
+            if (newScale !== currentScale) {
+                currentScale = newScale;
+                updateTransform();
+            }
+        }
+    }
+    
+    // 觸控結束事件
+    function handleTouchEnd(e) {
+        e.preventDefault();
+        
+        if (e.touches.length === 0) {
+            isTouch = false;
+            isDragging = false;
+            touches = [];
+        } else {
+            touches = Array.from(e.touches);
+            if (touches.length === 1) {
+                lastX = touches[0].clientX;
+                lastY = touches[0].clientY;
+            }
+        }
+    }
+    
+    // 拖拽功能（滑鼠）
+    function handleMouseDown(e) {
+        if (isTouch || currentScale <= 1) return;
+        
+        isDragging = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        previewImg.style.cursor = 'grabbing';
+        e.preventDefault();
+    }
+    
+    function handleMouseMove(e) {
+        if (isTouch || !isDragging || currentScale <= 1) return;
+        
+        const deltaX = e.clientX - lastX;
+        const deltaY = e.clientY - lastY;
+        
+        translateX += deltaX / currentScale;
+        translateY += deltaY / currentScale;
+        
+        lastX = e.clientX;
+        lastY = e.clientY;
+        
+        updateTransform();
+    }
+    
+    function handleMouseUp() {
+        if (isDragging && !isTouch) {
+            isDragging = false;
+            if (currentScale > 1) {
+                previewImg.style.cursor = 'grab';
+            }
+        }
+    }
+    
+    // 放大/縮小按鈕點擊事件
+    zoomBtn.addEventListener('click', function() {
+        if (currentScale > 1) {
+            resetZoom();
+        } else {
+            currentScale = 2;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        }
+    });
+    
+    // 圖片點擊事件（雙擊放大/縮小）
+    let clickCount = 0;
+    let tapCount = 0;
+    previewImg.addEventListener('click', function(e) {
+        if (isTouch) return; // 觸控設備不處理點擊事件
+        
+        clickCount++;
+        setTimeout(() => {
+            if (clickCount === 1) {
+                // 單擊 - 如果已放大則允許拖拽
+                if (currentScale <= 1) {
+                    currentScale = 2;
+                    translateX = 0;
+                    translateY = 0;
+                    updateTransform();
+                }
+            } else if (clickCount === 2) {
+                // 雙擊 - 重置縮放
+                resetZoom();
+            }
+            clickCount = 0;
+        }, 300);
+    });
+    
+    // 觸控雙擊事件
+    previewImg.addEventListener('touchend', function(e) {
+        tapCount++;
+        setTimeout(() => {
+            if (tapCount === 1) {
+                // 單擊 - 如果已放大則允許拖拽
+                if (currentScale <= 1) {
+                    currentScale = 2;
+                    translateX = 0;
+                    translateY = 0;
+                    updateTransform();
+                }
+            } else if (tapCount === 2) {
+                // 雙擊 - 重置縮放
+                resetZoom();
+            }
+            tapCount = 0;
+        }, 300);
+    });
+    
+    // 綁定滾輪事件
+    imageContainer.addEventListener('wheel', handleWheel, { passive: false });
+    
+    // 綁定觸控事件
+    previewImg.addEventListener('touchstart', handleTouchStart, { passive: false });
+    previewImg.addEventListener('touchmove', handleTouchMove, { passive: false });
+    previewImg.addEventListener('touchend', handleTouchEnd, { passive: false });
+    
+    // 綁定拖拽事件（滑鼠）
+    previewImg.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
+    // 模態框關閉時重置狀態
+    $('#imagePreviewModal').on('hidden.bs.modal', function() {
+        resetZoom();
+        // 清除事件監聽器中的狀態
+        isDragging = false;
+        isTouch = false;
+        touches = [];
+    });
+    
+    // 防止圖片被選中
+    previewImg.addEventListener('dragstart', function(e) {
+        e.preventDefault();
+    });
+    
+    // 防止上下文菜單（長按）
+    previewImg.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
 }
 </script>
 
@@ -946,6 +1575,198 @@ function previewImage(src, title) {
 .image-preview-container:hover .image-overlay {
     opacity: 1;
 }
+
+/* 付款狀態切換按鈕樣式 */
+.custom-switch .custom-control-label::before {
+    border-color: #adb5bd;
+}
+
+.custom-switch .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+/* 觸控優化樣式 */
+#previewImage {
+    touch-action: none; /* 禁用瀏覽器默認觸控行為 */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+#imageContainer {
+    touch-action: none; /* 禁用瀏覽器默認觸控行為 */
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 手機端優化 */
+@media (max-width: 768px) {
+    #imagePreviewModal .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+    
+    #imagePreviewModal .modal-body {
+        padding: 0.5rem;
+    }
+    
+    #imageControlsHint {
+        font-size: 0.8rem;
+        padding: 0.5rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    #imageContainer {
+        height: calc(80vh - 100px) !important;
+    }
+    
+    #previewImage {
+        width: 100%;
+        height: auto;
+        max-height: 100%;
+        object-fit: contain;
+    }
+}
+
+/* 防止觸控時的藍色選取框 */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 手機端浮動菜單按鈕樣式 */
+.floating-menu-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+    width: 60px;
+    height: 60px;
+    transition: all 0.3s ease;
+}
+
+.floating-menu-btn button {
+    width: 100%;
+    height: 100%;
+    border: none;
+    box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3);
+    transition: all 0.3s ease;
+    font-size: 1.2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.floating-menu-btn button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 25px rgba(0, 123, 255, 0.4);
+}
+
+.floating-menu-btn button:active {
+    transform: scale(0.95);
+}
+
+/* 浮動按鈕動畫效果 */
+.floating-menu-btn button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.floating-menu-btn button:active::before {
+    width: 100%;
+    height: 100%;
+}
+
+/* 浮動按鈕脈衝動畫 */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3), 0 0 0 0 rgba(0, 123, 255, 0.7);
+    }
+    70% {
+        box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3), 0 0 0 10px rgba(0, 123, 255, 0);
+    }
+    100% {
+        box-shadow: 0 4px 20px rgba(0, 123, 255, 0.3), 0 0 0 0 rgba(0, 123, 255, 0);
+    }
+}
+
+.floating-menu-btn button {
+    animation: pulse 2s infinite;
+}
+
+/* 手機端模態框優化 */
+@media (max-width: 767px) {
+    .modal-fullscreen-sm-down {
+        width: 100%;
+        height: 100%;
+        max-width: none !important;
+        margin: 0;
+    }
+    
+    .modal-fullscreen-sm-down .modal-content {
+        height: 100vh;
+        border: 0;
+        border-radius: 0;
+    }
+    
+    .modal-fullscreen-sm-down .modal-body {
+        overflow-y: auto;
+        padding: 1rem 0.5rem;
+        max-height: calc(100vh - 120px);
+    }
+    
+    .modal-fullscreen-sm-down .modal-header {
+        border-bottom: 1px solid #dee2e6;
+        padding: 1rem;
+    }
+    
+    /* 隱藏桌面端的菜單圖片卡片 */
+    #menuImagesCard {
+        display: none;
+    }
+    
+    /* 手機端浮動按鈕跟隨滾動 */
+    .floating-menu-btn {
+        position: fixed;
+        bottom: 80px; /* 避免與其他底部元素重疊 */
+        right: 15px;
+    }
+}
+
+/* 桌面端隱藏浮動按鈕 */
+@media (min-width: 768px) {
+    .floating-menu-btn {
+        display: none !important;
+    }
+    
+    /* 桌面端顯示菜單圖片卡片 */
+    #menuImagesCard {
+        display: block;
+    }
+}
+
+/* 響應式優化 */
+@media (max-width: 576px) {
+    .floating-menu-btn {
+        width: 55px;
+        height: 55px;
+        bottom: 70px;
+        right: 10px;
+    }
+    
+    .floating-menu-btn button {
+        font-size: 1.1rem;
+    }
+}
+
+
 </style>
 
 <!-- 載入 Lightbox CSS 和 JS -->

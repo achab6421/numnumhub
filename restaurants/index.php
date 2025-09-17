@@ -215,12 +215,12 @@ include_once __DIR__ . '/../includes/header.php';
                                     title="查看">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <!-- 修改編輯按鈕為直接跳轉的連結 -->
-                            <a href="<?php echo url('edit-restaurant', ['id' => $restaurant['id']]); ?>" 
-                               class="btn btn-sm btn-primary mr-1" 
-                               title="編輯">
+                            <button type="button" class="btn btn-sm btn-primary mr-1 edit-restaurant-btn" 
+                                    data-id="<?php echo $restaurant['id']; ?>" 
+                                    data-name="<?php echo htmlspecialchars($restaurant['name']); ?>"
+                                    title="編輯">
                                 <i class="fas fa-edit"></i>
-                            </a>
+                            </button>
                             <button type="button" class="btn btn-sm btn-danger delete-restaurant-btn" 
                                     data-id="<?php echo $restaurant['id']; ?>" 
                                     data-name="<?php echo htmlspecialchars($restaurant['name']); ?>"
@@ -247,8 +247,7 @@ include_once __DIR__ . '/../includes/header.php';
 <!-- 添加自訂 JavaScript -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // 移除編輯按鈕事件綁定，因為現在使用直接跳轉
-    /* 
+    // 所有編輯按鈕的點擊事件
     const editButtons = document.querySelectorAll('.edit-restaurant-btn');
     editButtons.forEach(button => {
         button.addEventListener('click', function() {
@@ -257,7 +256,6 @@ document.addEventListener('DOMContentLoaded', function() {
             editRestaurant(restaurantId, restaurantName);
         });
     });
-    */
     
     // 所有刪除按鈕的點擊事件
     const deleteButtons = document.querySelectorAll('.delete-restaurant-btn');
@@ -339,6 +337,89 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // 使用 SweetAlert 編輯餐廳
+    function editRestaurant(restaurantId, restaurantName) {
+        // 首先顯示載入中
+        Swal.fire({
+            title: '載入中...',
+            html: `正在載入 ${restaurantName} 的資料`,
+            didOpen: () => {
+                Swal.showLoading();
+            },
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false
+        });
+        
+        // 通過 AJAX 獲取餐廳資料
+        fetch(`<?php echo url('restaurants'); ?>/get_edit_form.php?id=${restaurantId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('無法載入餐廳資料');
+                }
+                return response.text();
+            })
+            .then(html => {
+                // 顯示編輯表單
+                Swal.fire({
+                    title: `編輯餐廳 - ${restaurantName}`,
+                    html: html,
+                    width: '800px',
+                    showCancelButton: true,
+                    confirmButtonText: '保存',
+                    cancelButtonText: '取消',
+                    showCloseButton: true,
+                    customClass: {
+                        container: 'swal-restaurant-container',
+                        popup: 'swal-restaurant-popup',
+                        content: 'swal-restaurant-content'
+                    },
+                    preConfirm: () => {
+                        // 獲取表單中的數據
+                        const form = Swal.getPopup().querySelector('form');
+                        const formData = new FormData(form);
+                        
+                        // 發送表單數據
+                        return fetch('<?php echo url('restaurants'); ?>/update_restaurant_ajax.php', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (!data.success) {
+                                throw new Error(data.message || '更新失敗');
+                            }
+                            return data;
+                        })
+                        .catch(error => {
+                            Swal.showValidationMessage(`請求失敗: ${error.message}`);
+                        });
+                    },
+                    allowOutsideClick: () => !Swal.isLoading()
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        Swal.fire({
+                            title: '成功!',
+                            text: '餐廳資料已更新',
+                            icon: 'success',
+                            timer: 1500,
+                            showConfirmButton: false
+                        }).then(() => {
+                            // 重新載入頁面顯示更新後的數據
+                            location.reload();
+                        });
+                    }
+                });
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: '錯誤',
+                    text: `載入失敗: ${error.message}`,
+                    icon: 'error'
+                });
+            });
+    }
+    
     // 使用 SweetAlert 查看餐廳
     function viewRestaurantSwal(restaurantId, restaurantName) {
         // 顯示載入中
@@ -381,8 +462,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }).then((result) => {
                     if (result.isDenied) {
-                        // 如果點擊編輯按鈕，直接跳轉至編輯頁面
-                        window.location.href = `<?php echo url('edit-restaurant'); ?>?id=${restaurantId}`;
+                        // 如果點擊編輯按鈕，打開編輯模態窗
+                        editRestaurant(restaurantId, restaurantName);
                     }
                 });
             })

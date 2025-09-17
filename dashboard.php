@@ -40,16 +40,26 @@ $recentEvents = $recentEventsStmt->get_result();
 // 獲取使用者參與的活動
 $sql = "SELECT e.*, r.name AS restaurant_name, u.name AS creator_name, 
         COUNT(ep2.id) AS participant_count, 
-        (e.creator_id = ?) AS is_creator
+        (e.creator_id = ?) AS is_creator,
+        (DATE(e.deadline) = CURDATE()) AS is_today,
+        (e.deadline IS NOT NULL AND e.deadline <= NOW()) AS is_overdue
         FROM event_participants ep
         JOIN events e ON ep.event_id = e.id
         JOIN restaurants r ON e.restaurant_id = r.id
         JOIN users u ON e.creator_id = u.id
         LEFT JOIN event_participants ep2 ON ep.event_id = ep2.event_id
-        WHERE ep.user_id = ? AND e.is_closed = 0  /* 添加條件：只顯示未關閉的活動 */
+        WHERE ep.user_id = ? AND (
+            e.is_closed = 0 OR  /* 未關閉的活動 */
+            (e.is_closed = 1 AND DATE(e.deadline) = CURDATE())  /* 今天關閉的活動 */
+        )
         GROUP BY e.id
-        ORDER BY e.created_at DESC
-        LIMIT 3"; // 只顯示最近的3個
+        ORDER BY 
+            is_today DESC,  /* 今天的活動優先 */
+            e.is_closed ASC, /* 未關閉的活動優先 */
+            is_overdue ASC, /* 未過期的活動優先 */
+            e.deadline ASC, /* 按截止時間排序 */
+            e.created_at DESC
+        LIMIT 3"; // 增加到6個以便顯示更多今天的活動
 
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("ii", $_SESSION['user_id'], $_SESSION['user_id']);
@@ -94,7 +104,7 @@ include 'includes/header.php';
     <div class="col-md-8 mb-4">
         <div class="card border-success h-100">
             <div class="card-header bg-success text-white">
-                <h5 class="m-0">最近活動</h5>
+                <h5 class="m-0">我的活動</h5>
             </div>
             <div class="card-body">
                 <?php if ($recentEvents->num_rows > 0): ?>
@@ -138,7 +148,6 @@ include 'includes/header.php';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a href="<?php echo url('event', ['id' => $event['id']]); ?>" class="btn btn-sm btn-info">查看</a>
                                         <a href="<?php echo url('order-system', ['id' => $event['id']]); ?>" class="btn btn-sm btn-primary">
                                             <i class="fas fa-utensils"></i> 點餐系統
                                         </a>
@@ -170,32 +179,84 @@ include 'includes/header.php';
                     <div class="row">
                         <?php while ($joinedEvent = $joinedEvents->fetch_assoc()): ?>
                             <div class="col-md-4 mb-3">
-                                <div class="card h-100 <?php echo $joinedEvent['is_closed'] ? 'border-secondary' : 'border-info'; ?>">
-                                    <div class="card-header <?php echo $joinedEvent['is_closed'] ? 'bg-secondary' : 'bg-info'; ?> text-white">
+                                <div class="card h-100 <?php 
+                                    if ($joinedEvent['is_today']) {
+                                        echo $joinedEvent['is_closed'] ? 'border-danger' : 'border-warning'; // 今天已關閉的用紅色，今天進行中的用橙色
+                                    } elseif ($joinedEvent['is_closed']) {
+                                        echo 'border-secondary';
+                                    } else {
+                                        echo 'border-info';
+                                    }
+                                ?>">
+                                    <div class="card-header <?php 
+                                        if ($joinedEvent['is_today']) {
+                                            echo $joinedEvent['is_closed'] ? 'bg-danger text-white' : 'bg-warning text-dark'; // 今天已關閉的用紅色背景
+                                        } elseif ($joinedEvent['is_closed']) {
+                                            echo 'bg-secondary text-white';
+                                        } else {
+                                            echo 'bg-info text-white';
+                                        }
+                                    ?> d-flex justify-content-between align-items-center">
                                         <h6 class="m-0 text-truncate" title="<?php echo htmlspecialchars($joinedEvent['title']); ?>">
                                             <?php echo htmlspecialchars($joinedEvent['title']); ?>
                                         </h6>
+                                        <?php if ($joinedEvent['is_today']): ?>
+                                            <span class="badge <?php echo $joinedEvent['is_closed'] ? 'badge-light' : 'badge-danger'; ?> badge-pill">
+                                                <i class="fas fa-clock"></i> 
+                                                <?php echo $joinedEvent['is_closed'] ? '今天已結束' : '今天'; ?>
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
                                     <div class="card-body">
+                                        <?php if ($joinedEvent['is_today']): ?>
+                                            <div class="alert <?php echo $joinedEvent['is_closed'] ? 'alert-danger' : 'alert-warning'; ?> p-2 mb-2">
+                                                <small>
+                                                    <i class="fas fa-<?php echo $joinedEvent['is_closed'] ? 'times-circle' : 'exclamation-triangle'; ?>"></i> 
+                                                    <strong><?php echo $joinedEvent['is_closed'] ? '今天已結束！' : '今天截止！'; ?></strong> 
+                                                    <?php echo date('H:i', strtotime($joinedEvent['deadline'])); ?>
+                                                </small>
+                                            </div>
+                                        <?php endif; ?>
+                                        
                                         <p class="card-text">
                                             <strong>餐廳:</strong> <?php echo htmlspecialchars($joinedEvent['restaurant_name']); ?><br>
                                             <strong>創建者:</strong> <?php echo htmlspecialchars($joinedEvent['creator_name']); ?><br>
                                             <strong>參與人數:</strong> <?php echo (int)$joinedEvent['participant_count']; ?><br>
                                             <?php if ($joinedEvent['deadline']): ?>
-                                                <strong>截止時間:</strong> <?php echo date('m/d H:i', strtotime($joinedEvent['deadline'])); ?>
+                                                <strong>截止時間:</strong> 
+                                                <span class="<?php echo $joinedEvent['is_today'] ? 'text-danger font-weight-bold' : ''; ?>">
+                                                    <?php echo date('m/d H:i', strtotime($joinedEvent['deadline'])); ?>
+                                                </span>
                                             <?php endif; ?>
                                         </p>
                                     </div>
                                     <div class="card-footer text-center">
-                                        <a href="<?php echo url('event', ['id' => $joinedEvent['id']]); ?>" class="btn btn-sm btn-info">進入活動</a>
-                                        <a href="<?php echo url('order-system', ['id' => $joinedEvent['id']]); ?>" class="btn btn-sm btn-primary">
-                                            <i class="fas fa-utensils"></i> 進入點餐
-                                        </a>
+                                        <?php if ($joinedEvent['is_closed']): ?>
+                                            <a href="<?php echo url('order-system', ['id' => $joinedEvent['id']]); ?>" 
+                                               class="btn btn-sm btn-secondary btn-block">
+                                                <i class="fas fa-eye"></i> 查看結果
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="<?php echo url('order-system', ['id' => $joinedEvent['id']]); ?>" 
+                                               class="btn btn-sm <?php echo $joinedEvent['is_today'] ? 'btn-warning' : 'btn-primary'; ?> btn-block">
+                                                <i class="fas fa-utensils"></i> 
+                                                <?php echo $joinedEvent['is_today'] ? '立即點餐' : '進入點餐'; ?>
+                                            </a>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             </div>
                         <?php endwhile; ?>
                     </div>
+
+                    <!-- 如果正好有6個活動，顯示查看更多按鈕 -->
+                    <?php if ($joinedEvents->num_rows === 6): ?>
+                    <div class="text-center mt-3">
+                        <a href="<?php echo url('events'); ?>" class="btn btn-secondary">
+                            <i class="fas fa-list"></i> 查看更多參與的活動
+                        </a>
+                    </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <p class="text-center py-3">您尚未參與任何活動。</p>
                 <?php endif; ?>

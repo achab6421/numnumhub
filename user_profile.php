@@ -24,6 +24,9 @@ $userTagIds = array_map(function($tag) {
 // 獲取所有可用標籤
 $allTags = getAllTags();
 
+$success = '';
+$error = '';
+
 // 處理表單提交
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // 處理標籤偏好更新
@@ -54,6 +57,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // 重新導向以避免重複提交
             redirect('user_profile');
+        }
+    }
+
+    // 處理姓名變更
+    if (isset($_POST['update_name'])) {
+        $new_name = trim($_POST['name']);
+        
+        // 驗證名稱
+        if (empty($new_name)) {
+            $error = '姓名不能為空';
+        } elseif (strlen($new_name) > 50) {
+            $error = '姓名不能超過50個字元';
+        } else {
+            // 更新資料庫中的名稱
+            $update_sql = "UPDATE users SET name = ? WHERE id = ?";
+            $update_stmt = $conn->prepare($update_sql);
+            $update_stmt->bind_param("si", $new_name, $userId);
+            
+            if ($update_stmt->execute()) {
+                // 更新 SESSION 中的用戶名
+                $_SESSION['user_name'] = $new_name;
+                $success = '姓名已成功更新';
+                
+                // 重新讀取用戶資料
+                $userName = $new_name;
+            } else {
+                $error = '更新姓名時發生錯誤';
+            }
+            
+            $update_stmt->close();
         }
     }
 }
@@ -95,16 +128,19 @@ include 'includes/header.php';
                         <h5 class="m-0">個人資料設定</h5>
                     </div>
                     <div class="card-body">
-                        <form>
+                        <form action="<?php echo url('user_profile'); ?>" method="post">
                             <div class="form-group">
                                 <label for="name">姓名</label>
-                                <input type="text" class="form-control" id="name" value="<?php echo htmlspecialchars($userName); ?>" readonly>
+                                <input type="text" class="form-control" id="name" name="name" value="<?php echo htmlspecialchars($userName); ?>" required maxlength="50">
                             </div>
                             <div class="form-group">
                                 <label for="email">電子郵件</label>
                                 <input type="email" class="form-control" id="email" value="<?php echo htmlspecialchars($userEmail); ?>" readonly>
+                                <small class="text-muted">電子郵件為帳號識別，無法修改</small>
                             </div>
-                            <p class="text-muted">目前暫不支援更改個人資料。</p>
+                            <button type="submit" name="update_name" class="btn btn-primary">
+                                <i class="fas fa-save"></i> 儲存姓名變更
+                            </button>
                         </form>
                     </div>
                 </div>

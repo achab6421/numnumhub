@@ -419,4 +419,24 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <?php include_once dirname(__DIR__) . '/includes/footer.php'; ?>
+
+<!-- 新增路由 -->
+'events' => 'events.php',
+'event' => 'event.php',
+'create-event' => 'create-event.php',
+'edit-event' => 'edit-event.php',
+'close-event' => 'close-event.php', // 添加關閉活動路由
+'join-by-code' => 'join-by-code.php',
+'order-system' => 'order-system.php',
+'leave-event' => 'leave_event.php', // 添加退出活動路由
+'update-payment-status' => [
+    'file' => 'update_payment_status.php',
+    'auth' => true,
+    'title' => '更新付款狀態'
+],
+
+// 確保退出活動的路由已正確設定
+if (!isset($routes['leave-event'])) {
+    $routes['leave-event'] = 'leave_event.php';
+}
 ```

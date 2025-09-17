@@ -42,7 +42,16 @@ if (isset($routes[$currentRoute]) && $routes[$currentRoute]['auth'] && !isLogged
     
     // 重導向到登入頁面
     if ($currentRoute !== 'login') {
-        header('Location: ' . url('login'));
+        // 檢查是否為特定的 join-by-code 路由並包含 code 參數
+        if (strpos($_SERVER['REQUEST_URI'], '/join-by-code') !== false && isset($_GET['code'])) {
+            // 如果是 join-by-code 頁面且有 code 參數，添加完整的查詢參數到重定向
+            $redirect_url = $_SERVER['REQUEST_URI'];
+            $login_url = (defined('BASE_URL') ? BASE_URL : 'https://achab6421phpaccount.free.nf/numnumhub/') . 'login?redirect=' . urlencode($redirect_url);
+            header('Location: ' . $login_url);
+        } else {
+            $login_url = (defined('BASE_URL') ? BASE_URL : 'https://achab6421phpaccount.free.nf/numnumhub/') . 'login';
+            header('Location: ' . $login_url);
+        }
         exit;
     }
 }
